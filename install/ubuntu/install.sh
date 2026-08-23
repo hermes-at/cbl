@@ -64,11 +64,19 @@ if [[ "$want_extension" -eq 1 ]]; then
   chmod 0644 "$EXT_DIR/"*
   echo "GNOME extension files are in: $EXT_DIR"
   if command -v gnome-extensions >/dev/null 2>&1; then
-    gnome-extensions enable cbl@hermes || true
-    if gnome-extensions list --enabled 2>/dev/null | grep -Fxq 'cbl@hermes'; then
-      echo "GNOME extension enabled: cbl@hermes"
+    package_dir="$(mktemp -d)"
+    if "$ROOT_DIR/install/ubuntu/package-gnome-extension.sh" "$package_dir" >/dev/null 2>&1; then
+      package_zip="$package_dir/cbl-gnome-extension.zip"
+      gnome-extensions install --force "$package_zip" || true
+      gnome-extensions enable cbl@hermes || true
+      if gnome-extensions list --enabled 2>/dev/null | grep -Fxq 'cbl@hermes'; then
+        echo "GNOME extension enabled: cbl@hermes"
+      else
+        echo "Run: gnome-extensions enable cbl@hermes"
+      fi
+      rm -rf "$package_dir"
     else
-      echo "Run: gnome-extensions enable cbl@hermes"
+      echo "Could not package GNOME extension; run: $ROOT_DIR/install/ubuntu/package-gnome-extension.sh"
     fi
   else
     echo "Run: gnome-extensions enable cbl@hermes"

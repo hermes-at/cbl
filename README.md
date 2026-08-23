@@ -46,7 +46,7 @@ From the internet on a fresh machine:
 curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash
 ```
 
-That installs `cbl`, starts the user service, copies the GNOME extension source, enables it when possible, and installs the tray helper.
+That installs `cbl`, starts the user service, installs the GNOME extension package, enables it when possible, and installs the tray helper.
 
 If you want the explicit platform installer, `./install/ubuntu/install.sh --all` does the same thing.
 
@@ -60,9 +60,19 @@ sudo apt install libayatana-appindicator3-dev
 
 ### One-command uninstall
 
+From a checked-out repo or unpacked release:
+
 ```bash
-./install/ubuntu/uninstall.sh
+./uninstall.sh
 ```
+
+From the internet on a fresh machine:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/uninstall.sh | bash
+```
+
+This removes the user service, extension, tray helper, autostart entry, and installed binaries.
 
 ### Package the GNOME extension for Extension Manager
 
