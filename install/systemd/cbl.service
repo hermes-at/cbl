@@ -1,0 +1,13 @@
+[Unit]
+Description=Codex Bar for Linux
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/cbl serve --addr 127.0.0.1:18088 --interval 5m
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

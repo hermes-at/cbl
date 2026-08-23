@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=cbl tray
+Comment=Codex usage tray indicator
+Exec=cbl-indicator.py
+Terminal=false
+X-GNOME-Autostart-enabled=true

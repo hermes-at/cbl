@@ -86,7 +86,7 @@ func runServe(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var opts cbl.Options
-	addr := fs.String("addr", "127.0.0.1:8088", "listen address")
+	addr := fs.String("addr", "127.0.0.1:18088", "listen address")
 	interval := fs.Duration("interval", 5*time.Minute, "refresh interval")
 	fs.StringVar(&opts.AuthFile, "auth", "", "path to Codex auth.json")
 	fs.StringVar(&opts.ConfigFile, "config", "", "path to config.toml")
@@ -107,7 +107,7 @@ func printHelp() error {
 Usage:
   cbl status [--json|--waybar] [--auth PATH] [--config PATH] [--base-url URL]
   cbl watch  [--interval 5m] [--waybar]
-  cbl serve  [--addr 127.0.0.1:8088] [--interval 5m]
+  cbl serve  [--addr 127.0.0.1:18088] [--interval 5m]
 
 Environment:
   CBL_AUTH_FILE   path to auth.json

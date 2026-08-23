@@ -24,6 +24,44 @@
 go build ./cmd/cbl
 ```
 
+## Install on Ubuntu
+
+The repo now ships three Linux integrations:
+
+1. **systemd --user** service for keeping `cbl serve` running
+2. **GNOME Shell extension** for a top-bar status item
+3. **AppIndicator / tray** helper for classic tray users
+
+### One-command install
+
+```bash
+./install/ubuntu/install.sh
+```
+
+That builds `cbl`, installs the user service, copies the GNOME extension source, and installs the tray helper.
+
+### Ubuntu packages
+
+For the tray helper and GNOME Shell bits, install these packages if they are missing:
+
+```bash
+sudo apt install python3-gi gir1.2-ayatanaappindicator3-0.1
+```
+
+### One-command uninstall
+
+```bash
+./install/ubuntu/uninstall.sh
+```
+
+### Package the GNOME extension for Extension Manager
+
+```bash
+./install/ubuntu/package-gnome-extension.sh
+```
+
+It produces `dist/cbl-gnome-extension.zip`, which you can load in Extension Manager.
+
 ## Usage
 
 ### One-shot status
@@ -43,8 +81,8 @@ go build ./cmd/cbl
 ### Local server for bars
 
 ```bash
-./cbl serve --addr 127.0.0.1:8088
-curl http://127.0.0.1:8088/waybar
+./cbl serve --addr 127.0.0.1:18088
+curl http://127.0.0.1:18088/waybar
 ```
 
 ## Environment
@@ -72,10 +110,15 @@ Use the `/waybar` endpoint or `cbl status --waybar`.
 
 The cleanest pattern is:
 
-1. run `cbl serve` in the background
-2. let a thin GNOME Shell extension poll `http://127.0.0.1:8088/waybar`
+1. run `cbl serve` in the background via the systemd user service
+2. let the GNOME Shell extension poll `http://127.0.0.1:18088/waybar`
 
-That keeps the Go side focused on Codex logic and lets the shell extension stay tiny.
+Package it with `./install/ubuntu/package-gnome-extension.sh` and install the zip in Extension Manager.
+
+### AppIndicator / tray
+
+The tray helper lives at `desktop/indicator/cbl-indicator.py`.
+It reads the same local server and can be autostarted from `~/.config/autostart/`.
 
 ## Notes
 
