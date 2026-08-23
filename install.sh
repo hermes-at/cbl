@@ -16,12 +16,15 @@ fi
 
 # If this script is running from a checked-out repo or an unpacked release,
 # reuse the local installer and skip the network bootstrap.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -x "$SCRIPT_DIR/install/ubuntu/install.sh" ]]; then
-  if [[ $# -eq 0 ]]; then
-    exec "$SCRIPT_DIR/install/ubuntu/install.sh" --all
+SCRIPT_SOURCE="${BASH_SOURCE[0]-}"
+if [[ -n "$SCRIPT_SOURCE" && -f "$SCRIPT_SOURCE" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+  if [[ -x "$SCRIPT_DIR/install/ubuntu/install.sh" ]]; then
+    if [[ $# -eq 0 ]]; then
+      exec "$SCRIPT_DIR/install/ubuntu/install.sh" --all
+    fi
+    exec "$SCRIPT_DIR/install/ubuntu/install.sh" "$@"
   fi
-  exec "$SCRIPT_DIR/install/ubuntu/install.sh" "$@"
 fi
 
 REPO="${CBL_REPO:-hermes-at/cbl}"
