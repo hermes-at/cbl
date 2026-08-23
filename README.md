@@ -34,8 +34,16 @@ The repo now ships three Linux integrations:
 
 ### One-command install
 
+From a checked-out repo or unpacked release:
+
 ```bash
 ./install.sh
+```
+
+From the internet on a fresh machine:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash
 ```
 
 That builds `cbl`, installs the user service, copies the GNOME extension source, and installs the tray helper.

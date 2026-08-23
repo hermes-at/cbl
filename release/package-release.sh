@@ -16,6 +16,7 @@ cp -R "$ROOT_DIR/desktop" "$BIN_DIR/desktop"
 cp "$ROOT_DIR/README.md" "$BIN_DIR/README.md"
 cp "$ROOT_DIR/Makefile" "$BIN_DIR/Makefile"
 cp "$ROOT_DIR/.gitignore" "$BIN_DIR/.gitignore"
+cp "$ROOT_DIR/go.mod" "$BIN_DIR/go.mod"
 cp "$ROOT_DIR/go.sum" "$BIN_DIR/go.sum"
 ( cd "$OUT_DIR" && tar -czf "$TAR_PATH" "cbl-$VERSION" )
 python3 - <<'PY' "$OUT_DIR" "$VERSION" "$ZIP_PATH"
