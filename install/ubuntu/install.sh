@@ -38,6 +38,10 @@ else
   done
 fi
 
+if [[ "$want_extension" -eq 1 || "$want_indicator" -eq 1 ]]; then
+  want_systemd=1
+fi
+
 mkdir -p "${HOME}/.local/bin" "${SYSTEMD_DIR}" "${EXT_DIR}" "${TRAY_DIR}" "${AUTOSTART_DIR}"
 
 echo "[1/4] Installing cbl binaries"
@@ -52,8 +56,12 @@ fi
 if [[ "$want_systemd" -eq 1 ]]; then
   echo "[2/4] Installing systemd --user service"
   install -m 0644 "$ROOT_DIR/install/systemd/cbl.service" "$SYSTEMD_DIR/cbl.service"
-  systemctl --user daemon-reload
-  systemctl --user enable --now cbl.service
+  if systemctl --user daemon-reload >/dev/null 2>&1; then
+    systemctl --user enable --now cbl.service >/dev/null 2>&1 || true
+    echo "User service installed: cbl.service"
+  else
+    echo "systemd user bus is not available right now; start cbl.service after login"
+  fi
 fi
 
 if [[ "$want_extension" -eq 1 ]]; then
