@@ -1,6 +1,6 @@
 BINARY=cbl
 
-.PHONY: build test tidy run install uninstall package-extension
+.PHONY: build test tidy run install uninstall package-extension package-release
 
 build:
 	go build -o bin/$(BINARY) ./cmd/cbl
@@ -22,3 +22,6 @@ uninstall:
 
 package-extension:
 	./install/ubuntu/package-gnome-extension.sh
+
+package-release:
+	./release/package-release.sh

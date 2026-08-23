@@ -35,10 +35,12 @@ The repo now ships three Linux integrations:
 ### One-command install
 
 ```bash
-./install/ubuntu/install.sh
+./install.sh
 ```
 
 That builds `cbl`, installs the user service, copies the GNOME extension source, and installs the tray helper.
+
+If you want the explicit platform installer, `./install/ubuntu/install.sh --all` does the same thing.
 
 ### Ubuntu packages
 
@@ -61,6 +63,10 @@ sudo apt install python3-gi gir1.2-ayatanaappindicator3-0.1
 ```
 
 It produces `dist/cbl-gnome-extension.zip`, which you can load in Extension Manager.
+
+### Release archives
+
+Use `./release/package-release.sh` to build a zip and tarball suitable for GitHub Releases.
 
 ## Usage
 
