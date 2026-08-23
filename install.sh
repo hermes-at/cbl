@@ -68,5 +68,7 @@ curl -fsSL -L "$asset_url" -o "$archive"
 mkdir -p "$TMP_DIR/extract"
 tar -xzf "$archive" -C "$TMP_DIR/extract"
 
-# The extracted archive contains the full install tree; delegate to it.
-exec "$TMP_DIR/extract/cbl-${version}/install.sh" "${@:-}" --all
+if [[ $# -eq 0 ]]; then
+  exec "$TMP_DIR/extract/cbl-${version}/install.sh" --all
+fi
+exec "$TMP_DIR/extract/cbl-${version}/install.sh" "$@"
