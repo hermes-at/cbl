@@ -40,9 +40,14 @@ fi
 
 mkdir -p "${HOME}/.local/bin" "${SYSTEMD_DIR}" "${EXT_DIR}" "${TRAY_DIR}" "${AUTOSTART_DIR}"
 
-echo "[1/4] Building cbl"
-(cd "$ROOT_DIR" && go build -o "$INSTALL_BIN" ./cmd/cbl && go build -o "$TRAY_BIN" ./cmd/cbl-tray)
-chmod 0755 "$INSTALL_BIN" "$TRAY_BIN"
+echo "[1/4] Installing cbl binaries"
+if [[ -x "$ROOT_DIR/cbl" && -x "$ROOT_DIR/cbl-tray" ]]; then
+  install -m 0755 "$ROOT_DIR/cbl" "$INSTALL_BIN"
+  install -m 0755 "$ROOT_DIR/cbl-tray" "$TRAY_BIN"
+else
+  (cd "$ROOT_DIR" && go build -o "$INSTALL_BIN" ./cmd/cbl && go build -o "$TRAY_BIN" ./cmd/cbl-tray)
+  chmod 0755 "$INSTALL_BIN" "$TRAY_BIN"
+fi
 
 if [[ "$want_systemd" -eq 1 ]]; then
   echo "[2/4] Installing systemd --user service"
