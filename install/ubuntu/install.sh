@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BIN_NAME="cbl"
 INSTALL_BIN="${HOME}/.local/bin/${BIN_NAME}"
+TRAY_BIN="${HOME}/.local/bin/cbl-tray"
 SYSTEMD_DIR="${HOME}/.config/systemd/user"
 EXT_DIR="${HOME}/.local/share/gnome-shell/extensions/cbl@hermes"
 TRAY_DIR="${HOME}/.local/share/cbl"
@@ -40,8 +41,8 @@ fi
 mkdir -p "${HOME}/.local/bin" "${SYSTEMD_DIR}" "${EXT_DIR}" "${TRAY_DIR}" "${AUTOSTART_DIR}"
 
 echo "[1/4] Building cbl"
-(cd "$ROOT_DIR" && go build -o "$INSTALL_BIN" ./cmd/cbl)
-chmod 0755 "$INSTALL_BIN"
+(cd "$ROOT_DIR" && go build -o "$INSTALL_BIN" ./cmd/cbl && go build -o "$TRAY_BIN" ./cmd/cbl-tray)
+chmod 0755 "$INSTALL_BIN" "$TRAY_BIN"
 
 if [[ "$want_systemd" -eq 1 ]]; then
   echo "[2/4] Installing systemd --user service"
@@ -62,10 +63,9 @@ fi
 
 if [[ "$want_indicator" -eq 1 ]]; then
   echo "[4/4] Installing tray indicator"
-  install -m 0755 "$ROOT_DIR/desktop/indicator/cbl-indicator.py" "$TRAY_DIR/cbl-indicator.py"
   install -m 0644 "$ROOT_DIR/desktop/indicator/cbl-indicator.desktop" "$AUTOSTART_DIR/cbl-indicator.desktop"
-  sed -i "s|^Exec=.*|Exec=${TRAY_DIR}/cbl-indicator.py|" "$AUTOSTART_DIR/cbl-indicator.desktop"
-  echo "Tray indicator installed to: $TRAY_DIR/cbl-indicator.py"
+  sed -i "s|^Exec=.*|Exec=${TRAY_BIN}|" "$AUTOSTART_DIR/cbl-indicator.desktop"
+  echo "Tray indicator installed to: $TRAY_BIN"
   echo "Autostart entry installed to: $AUTOSTART_DIR/cbl-indicator.desktop"
 fi
 

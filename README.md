@@ -44,10 +44,10 @@ If you want the explicit platform installer, `./install/ubuntu/install.sh --all`
 
 ### Ubuntu packages
 
-For the tray helper and GNOME Shell bits, install these packages if they are missing:
+For the tray helper build, install the native AppIndicator development package if it is missing:
 
 ```bash
-sudo apt install python3-gi gir1.2-ayatanaappindicator3-0.1
+sudo apt install libayatana-appindicator3-dev
 ```
 
 ### One-command uninstall

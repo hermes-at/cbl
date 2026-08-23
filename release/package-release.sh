@@ -9,13 +9,14 @@ ZIP_PATH="$OUT_DIR/cbl-$VERSION-linux-amd64.zip"
 TAR_PATH="$OUT_DIR/cbl-$VERSION-linux-amd64.tar.gz"
 
 mkdir -p "$BIN_DIR" "$OUT_DIR"
-( cd "$ROOT_DIR" && go build -o "$BIN_DIR/cbl" ./cmd/cbl )
+( cd "$ROOT_DIR" && go build -o "$BIN_DIR/cbl" ./cmd/cbl && go build -o "$BIN_DIR/cbl-tray" ./cmd/cbl-tray )
 cp "$ROOT_DIR/install.sh" "$BIN_DIR/install.sh"
 cp -R "$ROOT_DIR/install" "$BIN_DIR/install"
 cp -R "$ROOT_DIR/desktop" "$BIN_DIR/desktop"
 cp "$ROOT_DIR/README.md" "$BIN_DIR/README.md"
 cp "$ROOT_DIR/Makefile" "$BIN_DIR/Makefile"
 cp "$ROOT_DIR/.gitignore" "$BIN_DIR/.gitignore"
+cp "$ROOT_DIR/go.sum" "$BIN_DIR/go.sum"
 ( cd "$OUT_DIR" && tar -czf "$TAR_PATH" "cbl-$VERSION" )
 python3 - <<'PY' "$OUT_DIR" "$VERSION" "$ZIP_PATH"
 from pathlib import Path

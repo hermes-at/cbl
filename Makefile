@@ -1,9 +1,14 @@
 BINARY=cbl
 
-.PHONY: build test tidy run install uninstall package-extension package-release
+.PHONY: build build-tray build-all test tidy run install uninstall package-extension package-release
 
 build:
 	go build -o bin/$(BINARY) ./cmd/cbl
+
+build-tray:
+	go build -o bin/cbl-tray ./cmd/cbl-tray
+
+build-all: build build-tray
 
 test:
 	go test ./...
