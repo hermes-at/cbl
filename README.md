@@ -46,7 +46,7 @@ From the internet on a fresh machine:
 curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash
 ```
 
-That builds `cbl`, installs the user service, copies the GNOME extension source, and installs the tray helper.
+That installs `cbl`, starts the user service, copies the GNOME extension source, enables it when possible, and installs the tray helper.
 
 If you want the explicit platform installer, `./install/ubuntu/install.sh --all` does the same thing.
 
@@ -127,11 +127,12 @@ The cleanest pattern is:
 1. run `cbl serve` in the background via the systemd user service
 2. let the GNOME Shell extension poll `http://127.0.0.1:18088/waybar`
 
-Package it with `./install/ubuntu/package-gnome-extension.sh` and install the zip in Extension Manager.
+On GNOME Shell 50, the extension is enabled by the installer when possible.
+Package it with `./install/ubuntu/package-gnome-extension.sh` and install the zip in Extension Manager if you want manual control.
 
 ### AppIndicator / tray
 
-The tray helper lives at `desktop/indicator/cbl-indicator.py`.
+The tray helper is `cbl-tray`.
 It reads the same local server and can be autostarted from `~/.config/autostart/`.
 
 ## Notes

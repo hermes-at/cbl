@@ -63,7 +63,16 @@ if [[ "$want_extension" -eq 1 ]]; then
   cp -a "$ROOT_DIR/desktop/gnome-extension/cbl@hermes/." "$EXT_DIR/"
   chmod 0644 "$EXT_DIR/"*
   echo "GNOME extension files are in: $EXT_DIR"
-  echo "To install via Extension Manager, package it with: $ROOT_DIR/install/ubuntu/package-gnome-extension.sh"
+  if command -v gnome-extensions >/dev/null 2>&1; then
+    gnome-extensions enable cbl@hermes || true
+    if gnome-extensions list --enabled 2>/dev/null | grep -Fxq 'cbl@hermes'; then
+      echo "GNOME extension enabled: cbl@hermes"
+    else
+      echo "Run: gnome-extensions enable cbl@hermes"
+    fi
+  else
+    echo "Run: gnome-extensions enable cbl@hermes"
+  fi
 fi
 
 if [[ "$want_indicator" -eq 1 ]]; then
