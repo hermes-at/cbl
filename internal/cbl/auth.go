@@ -11,14 +11,14 @@ import (
 
 type authFile struct {
 	Tokens struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-		IDToken      string `json:"id_token"`
-		AccountID    string `json:"account_id"`
-		AccessToken2 string `json:"accessToken"`
+		AccessToken   string `json:"access_token"`
+		RefreshToken  string `json:"refresh_token"`
+		IDToken       string `json:"id_token"`
+		AccountID     string `json:"account_id"`
+		AccessToken2  string `json:"accessToken"`
 		RefreshToken2 string `json:"refreshToken"`
-		IDToken2     string `json:"idToken"`
-		AccountID2   string `json:"accountId"`
+		IDToken2      string `json:"idToken"`
+		AccountID2    string `json:"accountId"`
 	} `json:"tokens"`
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -29,11 +29,15 @@ type authFile struct {
 }
 
 func loadCredentials(opts Options) (Credentials, error) {
+	cfg := loadUserConfig(opts)
 	path := opts.AuthFile
 	if path == "" {
 		if env := strings.TrimSpace(os.Getenv("CBL_AUTH_FILE")); env != "" {
 			path = env
 		}
+	}
+	if path == "" && cfg.AuthFile != "" {
+		path = cfg.AuthFile
 	}
 	if path == "" {
 		if codexHome := strings.TrimSpace(os.Getenv("CODEX_HOME")); codexHome != "" {
@@ -61,11 +65,11 @@ func loadCredentials(opts Options) (Credentials, error) {
 		return Credentials{}, errors.New("auth.json exists but tokens.access_token / tokens.refresh_token are missing")
 	}
 	return Credentials{
-		AccessToken: access,
+		AccessToken:  access,
 		RefreshToken: refresh,
-		IDToken: idToken,
-		AccountID: accountID,
-		Source: "tokens",
+		IDToken:      idToken,
+		AccountID:    accountID,
+		Source:       "tokens",
 	}, nil
 }
 
@@ -75,6 +79,10 @@ func loadBaseURL(opts Options) string {
 	}
 	if env := strings.TrimSpace(os.Getenv("CBL_BASE_URL")); env != "" {
 		return env
+	}
+	cfg := loadUserConfig(opts)
+	if cfg.BaseURL != "" {
+		return cfg.BaseURL
 	}
 	if opts.ConfigFile != "" {
 		if url := parseBaseURLFromFile(opts.ConfigFile); url != "" {

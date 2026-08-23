@@ -16,6 +16,6 @@ out = Path(sys.argv[2])
 with ZipFile(out, 'w', ZIP_DEFLATED) as zf:
     for path in sorted(src.rglob('*')):
         if path.is_file():
-            zf.write(path, path.relative_to(src))
+            zf.write(path, path.relative_to(src.parent))
 print(out)
 PY

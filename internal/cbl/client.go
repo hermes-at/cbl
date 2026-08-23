@@ -20,7 +20,7 @@ type usageResponse struct {
 	RateLimit struct {
 		PrimaryWindow   *apiWindow `json:"primary_window"`
 		SecondaryWindow *apiWindow `json:"secondary_window"`
-		IndividualLimit *apiLimit   `json:"individual_limit"`
+		IndividualLimit *apiLimit  `json:"individual_limit"`
 	} `json:"rate_limit"`
 	Credits struct {
 		HasCredits bool   `json:"has_credits"`
@@ -34,8 +34,8 @@ type usageResponse struct {
 }
 
 type apiWindow struct {
-	UsedPercent       int   `json:"used_percent"`
-	ResetAt           int64 `json:"reset_at"`
+	UsedPercent        int   `json:"used_percent"`
+	ResetAt            int64 `json:"reset_at"`
 	LimitWindowSeconds int   `json:"limit_window_seconds"`
 }
 
@@ -47,18 +47,34 @@ type apiLimit struct {
 }
 
 func Load(ctx context.Context, opts Options) (UsageSnapshot, error) {
+	cfg := loadUserConfig(opts)
 	if fixture := strings.TrimSpace(opts.Fixture); fixture != "" {
-		return loadFromFixture(fixture)
+		snap, err := loadFromFixture(fixture)
+		if err != nil {
+			return UsageSnapshot{}, err
+		}
+		snap.ProfileName = cfg.ProfileName
+		return snap, nil
 	}
 	if fixture := strings.TrimSpace(os.Getenv("CBL_FIXTURE")); fixture != "" {
-		return loadFromFixture(fixture)
+		snap, err := loadFromFixture(fixture)
+		if err != nil {
+			return UsageSnapshot{}, err
+		}
+		snap.ProfileName = cfg.ProfileName
+		return snap, nil
 	}
 	creds, err := loadCredentials(opts)
 	if err != nil {
 		return UsageSnapshot{}, err
 	}
 	baseURL := loadBaseURL(opts)
-	return fetchUsage(ctx, creds, baseURL)
+	snap, err := fetchUsage(ctx, creds, baseURL)
+	if err != nil {
+		return UsageSnapshot{}, err
+	}
+	snap.ProfileName = cfg.ProfileName
+	return snap, nil
 }
 
 func loadFromFixture(path string) (UsageSnapshot, error) {
@@ -114,11 +130,12 @@ func mapFromBytes(data []byte, baseURL string) (UsageSnapshot, error) {
 func mapSnapshot(resp usageResponse, baseURL string) UsageSnapshot {
 	now := time.Now().UTC()
 	snap := UsageSnapshot{
-		AccountID: resp.AccountID,
-		PlanType:  resp.PlanType,
-		FetchedAt: now,
-		Source:    "oauth",
-		BaseURL:   baseURL,
+		AccountID:   resp.AccountID,
+		ProfileName: "",
+		PlanType:    resp.PlanType,
+		FetchedAt:   now,
+		Source:      "oauth",
+		BaseURL:     baseURL,
 	}
 	if resp.RateLimit.PrimaryWindow != nil {
 		win := mapWindow(*resp.RateLimit.PrimaryWindow, "5h")
@@ -155,11 +172,11 @@ func mapWindow(raw apiWindow, label string) UsageWindow {
 		resetAt = &t
 	}
 	return UsageWindow{
-		UsedPercent:       clamp(raw.UsedPercent, 0, 100),
-		ResetAt:           resetAt,
+		UsedPercent:        clamp(raw.UsedPercent, 0, 100),
+		ResetAt:            resetAt,
 		LimitWindowSeconds: raw.LimitWindowSeconds,
-		Label:             label,
-		RemainingPercent:  clamp(100-raw.UsedPercent, 0, 100),
+		Label:              label,
+		RemainingPercent:   clamp(100-raw.UsedPercent, 0, 100),
 	}
 }
 
@@ -220,7 +237,10 @@ func clamp(v, min, max int) int {
 }
 
 func (s UsageSnapshot) summaryLine() string {
-	parts := make([]string, 0, 4)
+	parts := make([]string, 0, 5)
+	if s.ProfileName != "" {
+		parts = append(parts, s.ProfileName)
+	}
 	if s.PrimaryWindow != nil {
 		parts = append(parts, fmt.Sprintf("5h %d%% left", s.PrimaryWindow.Remaining()))
 	}
@@ -240,6 +260,9 @@ func (s UsageSnapshot) summaryLine() string {
 
 func (s UsageSnapshot) tooltip() string {
 	lines := []string{s.summaryLine()}
+	if s.ProfileName != "" {
+		lines = append(lines, "profile: "+s.ProfileName)
+	}
 	if s.PlanType != "" {
 		lines = append(lines, "plan: "+s.PlanType)
 	}

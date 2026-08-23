@@ -12,7 +12,7 @@ type Options struct {
 }
 
 type Credentials struct {
-	AccessToken string
+	AccessToken  string
 	RefreshToken string
 	IDToken      string
 	AccountID    string
@@ -23,7 +23,7 @@ type Credentials struct {
 type UsageWindow struct {
 	UsedPercent        int
 	ResetAt            *time.Time
-	LimitWindowSeconds  int
+	LimitWindowSeconds int
 	Label              string
 	RemainingPercent   int
 }
@@ -39,12 +39,13 @@ type CreditLimit struct {
 
 type UsageSnapshot struct {
 	AccountID       string
+	ProfileName     string
 	PlanType        string
-	PrimaryWindow    *UsageWindow
-	SecondaryWindow  *UsageWindow
-	IndividualLimit  *CreditLimit
-	CreditsBalance   *float64
-	AdditionalRates  []NamedWindow
+	PrimaryWindow   *UsageWindow
+	SecondaryWindow *UsageWindow
+	IndividualLimit *CreditLimit
+	CreditsBalance  *float64
+	AdditionalRates []NamedWindow
 	FetchedAt       time.Time
 	Source          string
 	BaseURL         string

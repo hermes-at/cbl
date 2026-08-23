@@ -17,6 +17,7 @@
   - extra model-specific windows when present
 - outputs plain text, JSON, or Waybar JSON
 - can run a small HTTP server for panel integrations
+- supports a simple GNOME profile config saved in `~/.config/cbl/config.json`
 
 ## Build
 
@@ -136,6 +137,7 @@ The cleanest pattern is:
 
 1. run `cbl serve` in the background via the systemd user service
 2. let the GNOME Shell extension poll `http://127.0.0.1:18088/waybar`
+3. use the extension's *Add / edit profile…* entry to store `~/.config/cbl/config.json`
 
 On GNOME Shell 50, the extension is enabled by the installer when possible.
 Package it with `./install/ubuntu/package-gnome-extension.sh` and install the zip in Extension Manager if you want manual control.

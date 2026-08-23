@@ -25,16 +25,27 @@ func TestLoadCredentialsFromTokens(t *testing.T) {
 	}
 }
 
-func TestLoadCredentialsFromApiKey(t *testing.T) {
+func TestLoadCredentialsFromConfigAuthFile(t *testing.T) {
 	tmp := t.TempDir()
-	path := filepath.Join(tmp, "auth.json")
-	mustWrite(t, path, []byte(`{"OPENAI_API_KEY":"sk-test"}`))
-	creds, err := loadCredentials(Options{AuthFile: path})
+	authPath := filepath.Join(tmp, "auth.json")
+	mustWrite(t, authPath, []byte(`{"tokens":{"access_token":"a","refresh_token":"r","account_id":"acct-1"}}`))
+	cfgPath := filepath.Join(tmp, "config.json")
+	mustWrite(t, cfgPath, []byte(`{"profile_name":"work","auth_file":"`+authPath+`","base_url":"https://chatgpt.com/backend-api"}`))
+	creds, err := loadCredentials(Options{ConfigFile: cfgPath})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !creds.IsAPIKey || creds.AccessToken != "sk-test" {
+	if creds.AccessToken != "a" || creds.RefreshToken != "r" || creds.AccountID != "acct-1" {
 		t.Fatalf("unexpected creds: %#v", creds)
+	}
+}
+
+func TestLoadBaseURLFromConfig(t *testing.T) {
+	tmp := t.TempDir()
+	cfgPath := filepath.Join(tmp, "config.json")
+	mustWrite(t, cfgPath, []byte(`{"base_url":"https://example.com/custom"}`))
+	if got := loadBaseURL(Options{ConfigFile: cfgPath}); got != "https://example.com/custom" {
+		t.Fatalf("got %s", got)
 	}
 }
 
@@ -75,10 +86,10 @@ func TestMapSnapshotFromRateLimitResponse(t *testing.T) {
 
 func TestRenderWaybarJSON(t *testing.T) {
 	snap := UsageSnapshot{
-		FetchedAt: time.Unix(0, 0).UTC(),
-		PrimaryWindow: &UsageWindow{UsedPercent: 20, RemainingPercent: 80},
+		FetchedAt:       time.Unix(0, 0).UTC(),
+		PrimaryWindow:   &UsageWindow{UsedPercent: 20, RemainingPercent: 80},
 		SecondaryWindow: &UsageWindow{UsedPercent: 30, RemainingPercent: 70},
-		CreditsBalance: floatPtr(0),
+		CreditsBalance:  floatPtr(0),
 	}
 	var buf bytes.Buffer
 	if err := Render(&buf, snap, RenderOptions{Waybar: true}); err != nil {
