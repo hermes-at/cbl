@@ -12,9 +12,10 @@ AUTOSTART_DIR="${HOME}/.config/autostart"
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [--systemd] [--extension] [--indicator] [--all]
+Usage: install.sh [--systemd] [--indicator] [--extension] [--all]
 
-Default: install all three integrations.
+Default: install the user service and tray indicator.
+Use --extension if you explicitly want the GNOME Shell extension too.
 EOF
 }
 
@@ -23,7 +24,6 @@ want_extension=0
 want_indicator=0
 if [[ $# -eq 0 ]]; then
   want_systemd=1
-  want_extension=1
   want_indicator=1
 else
   for arg in "$@"; do
@@ -69,7 +69,8 @@ if [[ "$want_extension" -eq 1 ]]; then
   rm -rf "$EXT_DIR"
   mkdir -p "$EXT_DIR"
   cp -a "$ROOT_DIR/desktop/gnome-extension/cbl@hermes/." "$EXT_DIR/"
-  chmod 0644 "$EXT_DIR/"*
+  find "$EXT_DIR" -type d -exec chmod 0755 {} +
+  find "$EXT_DIR" -type f -exec chmod 0644 {} +
   echo "GNOME extension files are in: $EXT_DIR"
   if command -v gnome-extensions >/dev/null 2>&1; then
     package_dir="$(mktemp -d)"

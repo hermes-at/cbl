@@ -3,9 +3,10 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [--systemd] [--extension] [--indicator] [--all]
+Usage: install.sh [--systemd] [--indicator] [--extension] [--all]
 
-Default: install all three integrations.
+Default: install the user service and tray indicator.
+Use --extension if you explicitly want the GNOME Shell extension too.
 EOF
 }
 
@@ -20,9 +21,6 @@ SCRIPT_SOURCE="${BASH_SOURCE[0]-}"
 if [[ -n "$SCRIPT_SOURCE" && -f "$SCRIPT_SOURCE" ]]; then
   SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
   if [[ -x "$SCRIPT_DIR/install/ubuntu/install.sh" ]]; then
-    if [[ $# -eq 0 ]]; then
-      exec "$SCRIPT_DIR/install/ubuntu/install.sh" --all
-    fi
     exec "$SCRIPT_DIR/install/ubuntu/install.sh" "$@"
   fi
 fi
@@ -72,6 +70,6 @@ mkdir -p "$TMP_DIR/extract"
 tar -xzf "$archive" -C "$TMP_DIR/extract"
 
 if [[ $# -eq 0 ]]; then
-  exec "$TMP_DIR/extract/cbl-${version}/install.sh" --all
+  exec "$TMP_DIR/extract/cbl-${version}/install.sh"
 fi
 exec "$TMP_DIR/extract/cbl-${version}/install.sh" "$@"

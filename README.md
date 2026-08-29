@@ -27,11 +27,11 @@ go build ./cmd/cbl
 
 ## Install on Ubuntu
 
-The repo now ships three Linux integrations:
+The repo ships simple per-user Linux integrations:
 
 1. **systemd --user** service for keeping `cbl serve` running
-2. **GNOME Shell extension** for a top-bar status item
-3. **AppIndicator / tray** helper for classic tray users
+2. **AppIndicator / tray** helper for a visible desktop indicator
+3. optional **GNOME Shell extension** for people who want to test it manually
 
 ### One-command install
 
@@ -47,9 +47,9 @@ From the internet on a fresh machine:
 curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash
 ```
 
-That installs `cbl`, starts the user service, installs the GNOME extension package, enables it when possible, and installs the tray helper.
+That installs `cbl`, starts the user service, and installs the tray helper/autostart entry. It does **not** depend on the GNOME Shell extension path.
 
-If you want the explicit platform installer, `./install/ubuntu/install.sh --all` does the same thing.
+If you want the explicit platform installer, `./install/ubuntu/install.sh` does the same thing. To try the GNOME Shell extension too, run `./install.sh --all` or `./install.sh --extension`.
 
 ### Ubuntu packages
 
@@ -73,7 +73,7 @@ From the internet on a fresh machine:
 curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/uninstall.sh | bash
 ```
 
-This removes the user service, extension, tray helper, autostart entry, and installed binaries.
+This removes the user service, optional extension files, tray helper, autostart entry, installed binaries, and `~/.config/cbl`.
 
 ### Package the GNOME extension for Extension Manager
 
@@ -131,7 +131,7 @@ chatgpt_base_url = "https://chatgpt.com/backend-api"
 
 Use the `/waybar` endpoint or `cbl status --waybar`.
 
-### GNOME / Extension Manager
+### GNOME / Extension Manager (optional)
 
 The cleanest pattern is:
 
@@ -139,8 +139,7 @@ The cleanest pattern is:
 2. let the GNOME Shell extension poll `http://127.0.0.1:18088/waybar`
 3. use the extension's *Add / edit profile…* entry to store `~/.config/cbl/config.json`
 
-On GNOME Shell 50, the extension is enabled by the installer when possible.
-Package it with `./install/ubuntu/package-gnome-extension.sh` and install the zip in Extension Manager if you want manual control.
+The default installer intentionally skips the GNOME Shell extension and uses the tray helper. If you want to test the extension later, run `./install.sh --extension` or package it with `./install/ubuntu/package-gnome-extension.sh` and install the zip in Extension Manager.
 
 ### AppIndicator / tray
 
