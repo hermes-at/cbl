@@ -21,6 +21,7 @@ remove_tree() {
 systemctl --user disable --now cbl.service 2>/dev/null || true
 pkill -xu "$(id -u)" cbl-tray 2>/dev/null || true
 rm -f "${SYSTEMD_DIR}/cbl.service"
+rm -rf "${SYSTEMD_DIR}/cbl.service.d"
 remove_tree "${EXT_DIR}"
 remove_tree "${TRAY_DIR}"
 rm -f "${AUTOSTART_FILE}"

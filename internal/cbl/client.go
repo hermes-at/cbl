@@ -80,7 +80,8 @@ func Load(ctx context.Context, opts Options) (UsageSnapshot, error) {
 		return UsageSnapshot{}, err
 	}
 	baseURL := loadBaseURL(opts)
-	client, err := newHTTPClient(opts.Proxy)
+	proxy := loadProxy(opts)
+	client, err := newHTTPClient(proxy)
 	if err != nil {
 		return UsageSnapshot{}, err
 	}
@@ -101,7 +102,19 @@ func Load(ctx context.Context, opts Options) (UsageSnapshot, error) {
 		}
 	}
 	snap.ProfileName = cfg.ProfileName
+	snap.Proxy = proxy
 	return snap, nil
+}
+
+func loadProxy(opts Options) string {
+	if proxy := strings.TrimSpace(opts.Proxy); proxy != "" {
+		return proxy
+	}
+	if proxy := strings.TrimSpace(os.Getenv("CBL_PROXY")); proxy != "" {
+		return proxy
+	}
+	cfg := loadUserConfig(opts)
+	return strings.TrimSpace(cfg.Proxy)
 }
 
 func loadFromFixture(path string) (UsageSnapshot, error) {

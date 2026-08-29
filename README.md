@@ -53,6 +53,14 @@ That installs `cbl`, starts the user service, starts the tray helper for the cur
 
 `cbl login` prints a URL and one-time code, waits for you to approve it in the browser, then saves CBL's own auth file at `~/.config/cbl/auth.json`. You do **not** need to install Codex CLI.
 
+If you pass `--proxy` to `cbl login`, CBL stores that proxy in `~/.config/cbl/config.json`, so the background service and tray use it for later usage refreshes too.
+
+You can also bake the proxy into the systemd user service during install:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash -s -- --proxy socks5h://127.0.0.1:2080
+```
+
 If you want the explicit platform installer, `./install/ubuntu/install.sh` does the same thing. To try the GNOME Shell extension too, run `./install.sh --all` or `./install.sh --extension`.
 
 ### Ubuntu packages
@@ -97,6 +105,7 @@ Use `./release/package-release.sh` to build a zip and tarball suitable for GitHu
 
 ```bash
 cbl login
+CBL_PROXY=socks5h://127.0.0.1:2080 cbl status
 ./cbl status
 ./cbl status --json
 ./cbl status --waybar

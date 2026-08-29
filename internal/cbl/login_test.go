@@ -88,6 +88,22 @@ func TestRunDeviceLoginSavesCBLAuth(t *testing.T) {
 	}
 }
 
+func TestSaveUserProxyConfig(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("CODEX_HOME", "")
+	if err := saveUserProxy("socks5h://127.0.0.1:2080"); err != nil {
+		t.Fatal(err)
+	}
+	cfg := loadUserConfig(Options{})
+	if cfg.Proxy != "socks5h://127.0.0.1:2080" {
+		t.Fatalf("proxy = %q", cfg.Proxy)
+	}
+	if got := loadProxy(Options{}); got != "socks5h://127.0.0.1:2080" {
+		t.Fatalf("loadProxy = %q", got)
+	}
+}
+
 func TestDefaultAuthCandidatesPreferCBLAuth(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)

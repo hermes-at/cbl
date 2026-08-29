@@ -51,6 +51,7 @@ type UsageSnapshot struct {
 	FetchedAt       time.Time
 	Source          string
 	BaseURL         string
+	Proxy           string
 	Raw             any
 }
 

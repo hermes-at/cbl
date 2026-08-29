@@ -3,10 +3,11 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [--systemd] [--indicator] [--extension] [--all]
+Usage: install.sh [--systemd] [--indicator] [--extension] [--all] [--proxy URL]
 
 Default: install the user service and tray indicator.
 Use --extension if you explicitly want the GNOME Shell extension too.
+Use --proxy to bake an HTTP/SOCKS5 proxy into the user service.
 EOF
 }
 
