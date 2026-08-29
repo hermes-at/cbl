@@ -23,6 +23,8 @@ func run(ctx context.Context, args []string) error {
 	}
 
 	switch args[0] {
+	case "login":
+		return runLogin(ctx, args[1:])
 	case "status":
 		return runStatus(ctx, args[1:])
 	case "serve":
@@ -40,6 +42,23 @@ func run(ctx context.Context, args []string) error {
 		}
 		return fmt.Errorf("unknown command %q", args[0])
 	}
+}
+
+func runLogin(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("login", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	var authFile string
+	fs.StringVar(&authFile, "auth", "", "path to save CBL auth.json")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	path, err := cbl.RunDeviceLogin(ctx, cbl.LoginOptions{AuthFile: authFile, Out: os.Stdout})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Saved CBL auth to %s\n", path)
+	fmt.Println("Restart with: systemctl --user restart cbl.service; pkill cbl-tray; ~/.local/bin/cbl-tray &")
+	return nil
 }
 
 func runStatus(ctx context.Context, args []string) error {
@@ -106,6 +125,7 @@ func printHelp() error {
 
 Usage:
   cbl status [--json|--waybar] [--auth PATH] [--config PATH] [--base-url URL]
+  cbl login  [--auth PATH]
   cbl watch  [--interval 5m] [--waybar]
   cbl serve  [--addr 127.0.0.1:18088] [--interval 5m]
 

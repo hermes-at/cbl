@@ -16,6 +16,7 @@ type Credentials struct {
 	RefreshToken string
 	IDToken      string
 	AccountID    string
+	AuthFile     string
 	Source       string
 	IsAPIKey     bool
 }

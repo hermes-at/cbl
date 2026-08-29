@@ -1,10 +1,11 @@
 # cbl — Codex Bar for Linux
 
-`cbl` is a small Go app for Ubuntu/Linux that reads your local Codex auth, calls the Codex usage endpoint, and exposes the remaining windows in a way that works well for bars and panels.
+`cbl` is a small Go app for Ubuntu/Linux that signs in to your ChatGPT/Codex account, calls the Codex usage endpoint, and exposes the remaining windows in a way that works well for bars and panels.
 
 ## What it does
 
-- reads `~/.codex/auth.json` by default
+- has its own `cbl login` device-code flow; Codex CLI is not required
+- reads `~/.config/cbl/auth.json` by default, with fallback support for existing Codex CLI auth files
 - supports `tokens.access_token`, `tokens.refresh_token`, `tokens.account_id`
 - supports `OPENAI_API_KEY` auth files too
 - calls the current Codex usage endpoint:
@@ -45,9 +46,12 @@ From the internet on a fresh machine:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash
+cbl login
 ```
 
 That installs `cbl`, starts the user service, starts the tray helper for the current session, and adds the tray helper to autostart. It does **not** depend on the GNOME Shell extension path.
+
+`cbl login` prints a URL and one-time code, waits for you to approve it in the browser, then saves CBL's own auth file at `~/.config/cbl/auth.json`. You do **not** need to install Codex CLI.
 
 If you want the explicit platform installer, `./install/ubuntu/install.sh` does the same thing. To try the GNOME Shell extension too, run `./install.sh --all` or `./install.sh --extension`.
 
@@ -92,6 +96,7 @@ Use `./release/package-release.sh` to build a zip and tarball suitable for GitHu
 ### One-shot status
 
 ```bash
+cbl login
 ./cbl status
 ./cbl status --json
 ./cbl status --waybar

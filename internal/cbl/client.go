@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,16 @@ import (
 	"strings"
 	"time"
 )
+
+type UsageHTTPError struct {
+	StatusCode int
+	Status     string
+	Body       string
+}
+
+func (e *UsageHTTPError) Error() string {
+	return fmt.Sprintf("codex usage request failed: %s: %s", e.Status, e.Body)
+}
 
 type usageResponse struct {
 	AccountID string `json:"account_id"`
@@ -64,14 +75,26 @@ func Load(ctx context.Context, opts Options) (UsageSnapshot, error) {
 		snap.ProfileName = cfg.ProfileName
 		return snap, nil
 	}
-	creds, err := loadCredentials(opts)
+	creds, authPath, err := loadCredentialsWithPath(opts)
 	if err != nil {
 		return UsageSnapshot{}, err
 	}
 	baseURL := loadBaseURL(opts)
 	snap, err := fetchUsage(ctx, creds, baseURL)
 	if err != nil {
-		return UsageSnapshot{}, err
+		var usageErr *UsageHTTPError
+		if !creds.IsAPIKey && errors.As(err, &usageErr) && usageErr.StatusCode == http.StatusUnauthorized {
+			refreshed, refreshErr := RefreshCredentials(ctx, authPath, creds)
+			if refreshErr == nil {
+				creds = refreshed
+				snap, err = fetchUsage(ctx, creds, baseURL)
+			} else {
+				err = fmt.Errorf("%w; token refresh also failed: %v", err, refreshErr)
+			}
+		}
+		if err != nil {
+			return UsageSnapshot{}, err
+		}
 	}
 	snap.ProfileName = cfg.ProfileName
 	return snap, nil
@@ -112,7 +135,7 @@ func fetchUsage(ctx context.Context, creds Credentials, baseURL string) (UsageSn
 		return UsageSnapshot{}, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return UsageSnapshot{}, fmt.Errorf("codex usage request failed: %s: %s", resp.Status, strings.TrimSpace(string(body)))
+		return UsageSnapshot{}, &UsageHTTPError{StatusCode: resp.StatusCode, Status: resp.Status, Body: strings.TrimSpace(string(body))}
 	}
 	return mapFromBytes(body, baseURL)
 }

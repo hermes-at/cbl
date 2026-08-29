@@ -29,6 +29,11 @@ type authFile struct {
 }
 
 func loadCredentials(opts Options) (Credentials, error) {
+	creds, _, err := loadCredentialsWithPath(opts)
+	return creds, err
+}
+
+func loadCredentialsWithPath(opts Options) (Credentials, string, error) {
 	cfg := loadUserConfig(opts)
 	path := opts.AuthFile
 	if path == "" {
@@ -52,29 +57,34 @@ func loadCredentials(opts Options) (Credentials, error) {
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return Credentials{}, fmt.Errorf("read auth.json %s: %w", path, err)
+		return Credentials{}, path, fmt.Errorf("read auth.json %s: %w", path, err)
 	}
 	var doc authFile
 	if err := json.Unmarshal(data, &doc); err != nil {
-		return Credentials{}, fmt.Errorf("decode auth.json: %w", err)
+		return Credentials{}, path, fmt.Errorf("decode auth.json: %w", err)
 	}
 	if doc.APIKey != "" {
-		return Credentials{AccessToken: strings.TrimSpace(doc.APIKey), IsAPIKey: true, Source: "api-key"}, nil
+		return Credentials{AccessToken: strings.TrimSpace(doc.APIKey), AuthFile: path, IsAPIKey: true, Source: "api-key"}, path, nil
 	}
 	access := firstNonEmpty(doc.Tokens.AccessToken, doc.Tokens.AccessToken2, doc.AccessToken)
 	refresh := firstNonEmpty(doc.Tokens.RefreshToken, doc.Tokens.RefreshToken2, doc.RefreshToken)
 	idToken := firstNonEmpty(doc.Tokens.IDToken, doc.Tokens.IDToken2, doc.IDToken)
 	accountID := firstNonEmpty(doc.Tokens.AccountID, doc.Tokens.AccountID2, doc.AccountID)
 	if access == "" || refresh == "" {
-		return Credentials{}, errors.New("auth.json exists but tokens.access_token / tokens.refresh_token are missing")
+		return Credentials{}, path, errors.New("auth.json exists but tokens.access_token / tokens.refresh_token are missing")
 	}
 	return Credentials{
 		AccessToken:  access,
 		RefreshToken: refresh,
 		IDToken:      idToken,
 		AccountID:    accountID,
+		AuthFile:     path,
 		Source:       "tokens",
-	}, nil
+	}, path, nil
+}
+
+func defaultCBLAuthFile() string {
+	return filepath.Join(mustHome(), ".config", "cbl", "auth.json")
 }
 
 func defaultAuthFileCandidates() []string {
@@ -83,6 +93,7 @@ func defaultAuthFileCandidates() []string {
 	}
 	home := mustHome()
 	return []string{
+		defaultCBLAuthFile(),
 		filepath.Join(home, ".codex", "auth.json"),
 		filepath.Join(home, ".config", "codex", "auth.json"),
 	}
