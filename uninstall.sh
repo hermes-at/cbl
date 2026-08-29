@@ -19,6 +19,7 @@ if command -v gnome-extensions >/dev/null 2>&1; then
   gnome-extensions uninstall cbl@hermes >/dev/null 2>&1 || true
 fi
 systemctl --user disable --now cbl.service 2>/dev/null || true
+pkill -xu "$(id -u)" cbl-tray 2>/dev/null || true
 rm -f "${SYSTEMD_DIR}/cbl.service"
 rm -rf "${EXT_DIR}"
 rm -rf "${TRAY_DIR}"

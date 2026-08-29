@@ -98,6 +98,14 @@ if [[ "$want_indicator" -eq 1 ]]; then
   sed -i "s|^Exec=.*|Exec=${TRAY_BIN}|" "$AUTOSTART_DIR/cbl-indicator.desktop"
   echo "Tray indicator installed to: $TRAY_BIN"
   echo "Autostart entry installed to: $AUTOSTART_DIR/cbl-indicator.desktop"
+  if command -v pgrep >/dev/null 2>&1 && pgrep -xu "$(id -u)" cbl-tray >/dev/null 2>&1; then
+    echo "Tray indicator is already running."
+  elif [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
+    (setsid "$TRAY_BIN" >/dev/null 2>&1 &)
+    echo "Tray indicator started for this session."
+  else
+    echo "No desktop session detected; tray indicator will start on next login."
+  fi
 fi
 
 echo "Done."

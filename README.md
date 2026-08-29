@@ -47,7 +47,7 @@ From the internet on a fresh machine:
 curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash
 ```
 
-That installs `cbl`, starts the user service, and installs the tray helper/autostart entry. It does **not** depend on the GNOME Shell extension path.
+That installs `cbl`, starts the user service, starts the tray helper for the current session, and adds the tray helper to autostart. It does **not** depend on the GNOME Shell extension path.
 
 If you want the explicit platform installer, `./install/ubuntu/install.sh` does the same thing. To try the GNOME Shell extension too, run `./install.sh --all` or `./install.sh --extension`.
 
@@ -73,7 +73,7 @@ From the internet on a fresh machine:
 curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/uninstall.sh | bash
 ```
 
-This removes the user service, optional extension files, tray helper, autostart entry, installed binaries, and `~/.config/cbl`.
+This stops/removes the user service, stops/removes the tray helper, removes optional extension files, removes the autostart entry, removes installed binaries, and deletes `~/.config/cbl`.
 
 ### Package the GNOME extension for Extension Manager
 

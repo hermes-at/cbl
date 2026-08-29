@@ -8,6 +8,7 @@ AUTOSTART_FILE="${HOME}/.config/autostart/cbl-indicator.desktop"
 CONFIG_DIR="${HOME}/.config/cbl"
 
 systemctl --user disable --now cbl.service 2>/dev/null || true
+pkill -xu "$(id -u)" cbl-tray 2>/dev/null || true
 rm -f "${SYSTEMD_DIR}/cbl.service"
 rm -rf "${EXT_DIR}"
 rm -rf "${TRAY_DIR}"
