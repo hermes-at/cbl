@@ -40,6 +40,38 @@ func TestLoadCredentialsFromConfigAuthFile(t *testing.T) {
 	}
 }
 
+func TestLoadCredentialsFallsBackToXDGStyleCodexAuth(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("CODEX_HOME", "")
+	authPath := filepath.Join(tmp, ".config", "codex", "auth.json")
+	mustWrite(t, authPath, []byte(`{"tokens":{"access_token":"a","refresh_token":"r","account_id":"acct-1"}}`))
+	creds, err := loadCredentials(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if creds.AccessToken != "a" || creds.RefreshToken != "r" || creds.AccountID != "acct-1" {
+		t.Fatalf("unexpected creds: %#v", creds)
+	}
+}
+
+func TestLoadCredentialsPrefersLegacyCodexAuth(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("CODEX_HOME", "")
+	legacyPath := filepath.Join(tmp, ".codex", "auth.json")
+	xdgPath := filepath.Join(tmp, ".config", "codex", "auth.json")
+	mustWrite(t, legacyPath, []byte(`{"tokens":{"access_token":"legacy","refresh_token":"r","account_id":"acct-1"}}`))
+	mustWrite(t, xdgPath, []byte(`{"tokens":{"access_token":"xdg","refresh_token":"r","account_id":"acct-1"}}`))
+	creds, err := loadCredentials(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if creds.AccessToken != "legacy" {
+		t.Fatalf("got %q, want legacy", creds.AccessToken)
+	}
+}
+
 func TestLoadBaseURLFromConfig(t *testing.T) {
 	tmp := t.TempDir()
 	cfgPath := filepath.Join(tmp, "config.json")
@@ -147,6 +179,9 @@ func floatPtr(v float64) *float64 { return &v }
 
 func mustWrite(t *testing.T, path string, content []byte) {
 	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(path, content, 0o600); err != nil {
 		t.Fatal(err)
 	}

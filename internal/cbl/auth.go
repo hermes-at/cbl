@@ -40,15 +40,19 @@ func loadCredentials(opts Options) (Credentials, error) {
 		path = cfg.AuthFile
 	}
 	if path == "" {
-		if codexHome := strings.TrimSpace(os.Getenv("CODEX_HOME")); codexHome != "" {
-			path = filepath.Join(codexHome, "auth.json")
-		} else {
-			path = filepath.Join(mustHome(), ".codex", "auth.json")
+		for _, candidate := range defaultAuthFileCandidates() {
+			if _, err := os.Stat(candidate); err == nil {
+				path = candidate
+				break
+			}
+		}
+		if path == "" {
+			path = defaultAuthFileCandidates()[0]
 		}
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return Credentials{}, fmt.Errorf("read auth.json: %w", err)
+		return Credentials{}, fmt.Errorf("read auth.json %s: %w", path, err)
 	}
 	var doc authFile
 	if err := json.Unmarshal(data, &doc); err != nil {
@@ -71,6 +75,17 @@ func loadCredentials(opts Options) (Credentials, error) {
 		AccountID:    accountID,
 		Source:       "tokens",
 	}, nil
+}
+
+func defaultAuthFileCandidates() []string {
+	if codexHome := strings.TrimSpace(os.Getenv("CODEX_HOME")); codexHome != "" {
+		return []string{filepath.Join(codexHome, "auth.json")}
+	}
+	home := mustHome()
+	return []string{
+		filepath.Join(home, ".codex", "auth.json"),
+		filepath.Join(home, ".config", "codex", "auth.json"),
+	}
 }
 
 func loadBaseURL(opts Options) string {
