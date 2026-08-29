@@ -48,11 +48,13 @@ func runLogin(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("login", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var authFile string
+	var proxy string
 	fs.StringVar(&authFile, "auth", "", "path to save CBL auth.json")
+	fs.StringVar(&proxy, "proxy", "", "HTTP or SOCKS5 proxy URL, e.g. socks5h://127.0.0.1:2080")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	path, err := cbl.RunDeviceLogin(ctx, cbl.LoginOptions{AuthFile: authFile, Out: os.Stdout})
+	path, err := cbl.RunDeviceLogin(ctx, cbl.LoginOptions{AuthFile: authFile, Proxy: proxy, Out: os.Stdout})
 	if err != nil {
 		return err
 	}
@@ -68,6 +70,7 @@ func runStatus(ctx context.Context, args []string) error {
 	fs.StringVar(&opts.AuthFile, "auth", "", "path to Codex auth.json")
 	fs.StringVar(&opts.ConfigFile, "config", "", "path to config.toml")
 	fs.StringVar(&opts.BaseURL, "base-url", "", "override ChatGPT base URL")
+	fs.StringVar(&opts.Proxy, "proxy", "", "HTTP or SOCKS5 proxy URL, e.g. socks5h://127.0.0.1:2080")
 	fs.StringVar(&opts.Fixture, "fixture", "", "read usage JSON from a file instead of calling the API")
 	fs.BoolVar(&opts.JSON, "json", false, "print machine-readable JSON")
 	fs.BoolVar(&opts.Waybar, "waybar", false, "print Waybar JSON")
@@ -90,6 +93,7 @@ func runWatch(ctx context.Context, args []string) error {
 	fs.StringVar(&opts.AuthFile, "auth", "", "path to Codex auth.json")
 	fs.StringVar(&opts.ConfigFile, "config", "", "path to config.toml")
 	fs.StringVar(&opts.BaseURL, "base-url", "", "override ChatGPT base URL")
+	fs.StringVar(&opts.Proxy, "proxy", "", "HTTP or SOCKS5 proxy URL, e.g. socks5h://127.0.0.1:2080")
 	fs.StringVar(&opts.Fixture, "fixture", "", "read usage JSON from a file instead of calling the API")
 	fs.BoolVar(&opts.Waybar, "waybar", false, "print Waybar JSON")
 	if err := fs.Parse(args); err != nil {
@@ -110,6 +114,7 @@ func runServe(ctx context.Context, args []string) error {
 	fs.StringVar(&opts.AuthFile, "auth", "", "path to Codex auth.json")
 	fs.StringVar(&opts.ConfigFile, "config", "", "path to config.toml")
 	fs.StringVar(&opts.BaseURL, "base-url", "", "override ChatGPT base URL")
+	fs.StringVar(&opts.Proxy, "proxy", "", "HTTP or SOCKS5 proxy URL, e.g. socks5h://127.0.0.1:2080")
 	fs.StringVar(&opts.Fixture, "fixture", "", "read usage JSON from a file instead of calling the API")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -124,15 +129,16 @@ func printHelp() error {
 	fmt.Print(`cbl - Codex bar for Linux
 
 Usage:
-  cbl status [--json|--waybar] [--auth PATH] [--config PATH] [--base-url URL]
-  cbl login  [--auth PATH]
-  cbl watch  [--interval 5m] [--waybar]
-  cbl serve  [--addr 127.0.0.1:18088] [--interval 5m]
+  cbl status [--json|--waybar] [--auth PATH] [--config PATH] [--base-url URL] [--proxy URL]
+  cbl login  [--auth PATH] [--proxy URL]
+  cbl watch  [--interval 5m] [--waybar] [--proxy URL]
+  cbl serve  [--addr 127.0.0.1:18088] [--interval 5m] [--proxy URL]
 
 Environment:
   CBL_AUTH_FILE   path to auth.json
   CBL_CONFIG_FILE  path to config.toml
   CBL_BASE_URL     override ChatGPT base URL
+  CBL_PROXY        HTTP or SOCKS5 proxy URL
   CBL_FIXTURE      response JSON fixture for offline use
 
 Default API path:

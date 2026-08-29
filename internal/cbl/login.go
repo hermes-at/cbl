@@ -26,6 +26,7 @@ type LoginOptions struct {
 	AuthFile string
 	Issuer   string
 	ClientID string
+	Proxy    string
 	Out      io.Writer
 }
 
@@ -56,7 +57,11 @@ type exchangedTokens struct {
 }
 
 func RunDeviceLogin(ctx context.Context, opts LoginOptions) (string, error) {
-	device, err := RequestDeviceCode(ctx, opts)
+	client, err := newHTTPClient(opts.Proxy)
+	if err != nil {
+		return "", err
+	}
+	device, err := RequestDeviceCode(ctx, client, opts)
 	if err != nil {
 		return "", err
 	}
@@ -65,7 +70,7 @@ func RunDeviceLogin(ctx context.Context, opts LoginOptions) (string, error) {
 		out = os.Stdout
 	}
 	fmt.Fprintf(out, "Open this URL and sign in:\n  %s\n\nEnter this code:\n  %s\n\nWaiting for confirmation...\n", device.VerificationURL, device.UserCode)
-	creds, err := CompleteDeviceLogin(ctx, opts, device)
+	creds, err := CompleteDeviceLogin(ctx, client, opts, device)
 	if err != nil {
 		return "", err
 	}
@@ -79,7 +84,7 @@ func RunDeviceLogin(ctx context.Context, opts LoginOptions) (string, error) {
 	return path, nil
 }
 
-func RequestDeviceCode(ctx context.Context, opts LoginOptions) (DeviceCode, error) {
+func RequestDeviceCode(ctx context.Context, client *http.Client, opts LoginOptions) (DeviceCode, error) {
 	issuer := loginIssuer(opts)
 	clientID := loginClientID(opts)
 	body, _ := json.Marshal(map[string]string{"client_id": clientID})
@@ -90,7 +95,7 @@ func RequestDeviceCode(ctx context.Context, opts LoginOptions) (DeviceCode, erro
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "cbl")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return DeviceCode{}, err
 	}
@@ -119,9 +124,9 @@ func RequestDeviceCode(ctx context.Context, opts LoginOptions) (DeviceCode, erro
 	}, nil
 }
 
-func CompleteDeviceLogin(ctx context.Context, opts LoginOptions, device DeviceCode) (Credentials, error) {
+func CompleteDeviceLogin(ctx context.Context, client *http.Client, opts LoginOptions, device DeviceCode) (Credentials, error) {
 	issuer := loginIssuer(opts)
-	poll, err := pollDeviceToken(ctx, issuer, device)
+	poll, err := pollDeviceToken(ctx, client, issuer, device)
 	if err != nil {
 		return Credentials{}, err
 	}
@@ -129,14 +134,14 @@ func CompleteDeviceLogin(ctx context.Context, opts LoginOptions, device DeviceCo
 		return Credentials{}, fmt.Errorf("device token response missing code_verifier")
 	}
 	redirectURI := issuer + "/deviceauth/callback"
-	tokens, err := exchangeAuthorizationCode(ctx, issuer, loginClientID(opts), redirectURI, poll.AuthorizationCode, poll.CodeVerifier)
+	tokens, err := exchangeAuthorizationCode(ctx, client, issuer, loginClientID(opts), redirectURI, poll.AuthorizationCode, poll.CodeVerifier)
 	if err != nil {
 		return Credentials{}, err
 	}
 	return credentialsFromTokens(tokens)
 }
 
-func pollDeviceToken(ctx context.Context, issuer string, device DeviceCode) (tokenPollResp, error) {
+func pollDeviceToken(ctx context.Context, client *http.Client, issuer string, device DeviceCode) (tokenPollResp, error) {
 	deadline := time.Now().Add(15 * time.Minute)
 	for {
 		body, _ := json.Marshal(map[string]string{
@@ -150,7 +155,7 @@ func pollDeviceToken(ctx context.Context, issuer string, device DeviceCode) (tok
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("User-Agent", "cbl")
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			return tokenPollResp{}, err
 		}
@@ -180,7 +185,7 @@ func pollDeviceToken(ctx context.Context, issuer string, device DeviceCode) (tok
 	}
 }
 
-func exchangeAuthorizationCode(ctx context.Context, issuer, clientID, redirectURI, code, verifier string) (exchangedTokens, error) {
+func exchangeAuthorizationCode(ctx context.Context, client *http.Client, issuer, clientID, redirectURI, code, verifier string) (exchangedTokens, error) {
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", code)
@@ -194,7 +199,7 @@ func exchangeAuthorizationCode(ctx context.Context, issuer, clientID, redirectUR
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "cbl")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return exchangedTokens{}, err
 	}
@@ -213,7 +218,7 @@ func exchangeAuthorizationCode(ctx context.Context, issuer, clientID, redirectUR
 	return tokens, nil
 }
 
-func RefreshCredentials(ctx context.Context, authPath string, creds Credentials) (Credentials, error) {
+func RefreshCredentials(ctx context.Context, client *http.Client, authPath string, creds Credentials) (Credentials, error) {
 	if creds.RefreshToken == "" {
 		return Credentials{}, fmt.Errorf("auth.json has no refresh_token; run cbl login again")
 	}
@@ -229,7 +234,7 @@ func RefreshCredentials(ctx context.Context, authPath string, creds Credentials)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "cbl")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return Credentials{}, err
 	}

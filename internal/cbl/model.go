@@ -6,6 +6,7 @@ type Options struct {
 	AuthFile   string
 	ConfigFile string
 	BaseURL    string
+	Proxy      string
 	Fixture    string
 	JSON       bool
 	Waybar     bool

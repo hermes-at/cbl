@@ -80,14 +80,18 @@ func Load(ctx context.Context, opts Options) (UsageSnapshot, error) {
 		return UsageSnapshot{}, err
 	}
 	baseURL := loadBaseURL(opts)
-	snap, err := fetchUsage(ctx, creds, baseURL)
+	client, err := newHTTPClient(opts.Proxy)
+	if err != nil {
+		return UsageSnapshot{}, err
+	}
+	snap, err := fetchUsage(ctx, client, creds, baseURL)
 	if err != nil {
 		var usageErr *UsageHTTPError
 		if !creds.IsAPIKey && errors.As(err, &usageErr) && usageErr.StatusCode == http.StatusUnauthorized {
-			refreshed, refreshErr := RefreshCredentials(ctx, authPath, creds)
+			refreshed, refreshErr := RefreshCredentials(ctx, client, authPath, creds)
 			if refreshErr == nil {
 				creds = refreshed
-				snap, err = fetchUsage(ctx, creds, baseURL)
+				snap, err = fetchUsage(ctx, client, creds, baseURL)
 			} else {
 				err = fmt.Errorf("%w; token refresh also failed: %v", err, refreshErr)
 			}
@@ -108,7 +112,7 @@ func loadFromFixture(path string) (UsageSnapshot, error) {
 	return mapFromBytes(data, "fixture")
 }
 
-func fetchUsage(ctx context.Context, creds Credentials, baseURL string) (UsageSnapshot, error) {
+func fetchUsage(ctx context.Context, client *http.Client, creds Credentials, baseURL string) (UsageSnapshot, error) {
 	usageURL, err := resolveUsageURL(baseURL)
 	if err != nil {
 		return UsageSnapshot{}, err
@@ -124,7 +128,9 @@ func fetchUsage(ctx context.Context, creds Credentials, baseURL string) (UsageSn
 		request.Header.Set("ChatGPT-Account-Id", creds.AccountID)
 		request.Header.Set("ChatGPT-Account-ID", creds.AccountID)
 	}
-	client := &http.Client{Timeout: 30 * time.Second}
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
 	resp, err := client.Do(request)
 	if err != nil {
 		return UsageSnapshot{}, err

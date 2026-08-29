@@ -46,7 +46,7 @@ From the internet on a fresh machine:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash
-cbl login
+cbl login --proxy socks5h://127.0.0.1:2080
 ```
 
 That installs `cbl`, starts the user service, starts the tray helper for the current session, and adds the tray helper to autostart. It does **not** depend on the GNOME Shell extension path.
@@ -120,6 +120,7 @@ curl http://127.0.0.1:18088/waybar
 - `CBL_AUTH_FILE` — override auth.json path
 - `CBL_CONFIG_FILE` — override config.toml path
 - `CBL_BASE_URL` — override the ChatGPT base URL
+- `CBL_PROXY` — HTTP or SOCKS5 proxy URL for `status`, `watch`, `serve`, and `login`
 - `CBL_FIXTURE` — offline JSON fixture for testing
 
 ## Config file
@@ -153,4 +154,4 @@ It reads the same local server and can be autostarted from `~/.config/autostart/
 
 ## Notes
 
-This repo is intentionally Codex-only for now, per your request.
+This repo is intentionally built around CBL login and usage, not the Codex CLI.
