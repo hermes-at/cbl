@@ -74,6 +74,7 @@ func Serve(ctx context.Context, addr string, interval time.Duration, opts Option
 	}()
 
 	mux := http.NewServeMux()
+	registerUIHandlers(mux, state, opts)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		snap, err := state.get()

@@ -53,6 +53,8 @@ That installs `cbl`, starts the user service, starts the tray helper for the cur
 
 `cbl login` prints a URL and one-time code, waits for you to approve it in the browser, then saves CBL's own auth file at `~/.config/cbl/auth.json`. You do **not** need to install Codex CLI.
 
+The tray menu also includes **Usage Dashboard…** and **Add Account / Login…**. Both open the local CBL dashboard at `http://127.0.0.1:18088/dashboard`, so you can view progress bars and start login from the bar without using the terminal.
+
 If you pass `--proxy` to `cbl login`, CBL stores that proxy in `~/.config/cbl/config.json`, so the background service and tray use it for later usage refreshes too.
 
 You can also bake the proxy into the systemd user service during install:

@@ -8,12 +8,14 @@ import (
 	"image/png"
 	"io"
 	"net/http"
+	"os/exec"
 	"time"
 
 	"github.com/getlantern/systray"
 )
 
 const waybarURL = "http://127.0.0.1:18088/waybar"
+const dashboardURL = "http://127.0.0.1:18088/dashboard"
 
 func main() {
 	systray.Run(onReady, onExit)
@@ -26,6 +28,9 @@ func onReady() {
 
 	status := systray.AddMenuItem("cbl starting…", "Codex status")
 	refresh := systray.AddMenuItem("Refresh", "Refresh now")
+	dashboard := systray.AddMenuItem("Usage Dashboard…", "Open CBL dashboard")
+	login := systray.AddMenuItem("Add Account / Login…", "Open CBL login")
+	statusPage := systray.AddMenuItem("OpenAI Status Page…", "Open OpenAI status page")
 	systray.AddSeparator()
 	quit := systray.AddMenuItem("Quit", "Exit cbl tray")
 
@@ -49,6 +54,12 @@ func onReady() {
 			select {
 			case <-refresh.ClickedCh:
 				refreshStatus()
+			case <-dashboard.ClickedCh:
+				openURL(dashboardURL)
+			case <-login.ClickedCh:
+				openURL(dashboardURL + "#login")
+			case <-statusPage.ClickedCh:
+				openURL("https://status.openai.com/")
 			case <-ticker.C:
 				refreshStatus()
 			case <-quit.ClickedCh:
@@ -60,6 +71,10 @@ func onReady() {
 }
 
 func onExit() {}
+
+func openURL(url string) {
+	_ = exec.Command("xdg-open", url).Start()
+}
 
 func fetch() (string, string, error) {
 	resp, err := http.Get(waybarURL)
