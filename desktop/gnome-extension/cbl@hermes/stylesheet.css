@@ -1,0 +1,77 @@
+.cbl-popup-item {
+  padding: 0;
+}
+
+.cbl-popup {
+  min-width: 360px;
+  padding: 14px;
+  spacing: 12px;
+}
+
+.cbl-header {
+  spacing: 12px;
+  margin-bottom: 2px;
+}
+
+.cbl-heading {
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.cbl-subheading,
+.cbl-card-meta {
+  color: #a8a8b3;
+  font-size: 12px;
+}
+
+.cbl-badge {
+  color: #06140c;
+  background-color: #2ed36f;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.cbl-card,
+.cbl-login-box {
+  background-color: #202020;
+  border: 1px solid #323236;
+  border-radius: 18px;
+  padding: 14px;
+  spacing: 8px;
+}
+
+.cbl-card-title {
+  color: #a8a8b3;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cbl-card-value {
+  color: #f4f4f5;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.cbl-progress-track {
+  width: 260px;
+  height: 10px;
+  background-color: #e8e8ec;
+  border-radius: 999px;
+}
+
+.cbl-progress-fill {
+  height: 10px;
+  background-color: #2ed36f;
+  border-radius: 999px;
+}
+
+.cbl-progress-fill:warning {
+  background-color: #f5c542;
+}
+
+.cbl-progress-fill:critical {
+  background-color: #ff5c5c;
+}

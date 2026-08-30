@@ -5,8 +5,9 @@ usage() {
   cat <<'EOF'
 Usage: install.sh [--systemd] [--indicator] [--extension] [--all] [--proxy URL]
 
-Default: install the user service and tray indicator.
-Use --extension if you explicitly want the GNOME Shell extension too.
+Default on GNOME: install the user service and GNOME top-bar extension.
+Default elsewhere: install the user service and tray indicator fallback.
+Use --indicator if you explicitly want the AppIndicator tray helper.
 Use --proxy to bake an HTTP/SOCKS5 proxy into the user service.
 EOF
 }

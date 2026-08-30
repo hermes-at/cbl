@@ -31,8 +31,8 @@ go build ./cmd/cbl
 The repo ships simple per-user Linux integrations:
 
 1. **systemd --user** service for keeping `cbl serve` running
-2. **AppIndicator / tray** helper for a visible desktop indicator
-3. optional **GNOME Shell extension** for people who want to test it manually
+2. **GNOME Shell extension** for the primary top-bar CodexBar-like popup
+3. **AppIndicator / tray** helper as a fallback on non-GNOME desktops
 
 ### One-command install
 
@@ -49,11 +49,11 @@ curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bas
 cbl login --proxy socks5h://127.0.0.1:2080
 ```
 
-That installs `cbl`, starts the user service, starts the tray helper for the current session, and adds the tray helper to autostart. It does **not** depend on the GNOME Shell extension path.
+On GNOME, that installs `cbl`, starts the user service, installs/enables the `cbl@hermes` top-bar extension, and removes the old tray autostart to avoid duplicate indicators. On non-GNOME desktops it falls back to the AppIndicator tray helper.
 
 `cbl login` prints a URL and one-time code, waits for you to approve it in the browser, then saves CBL's own auth file at `~/.config/cbl/auth.json`. You do **not** need to install Codex CLI.
 
-The tray menu is the primary UI: it shows Codex usage percentages, text progress bars, credits, account/plan info, refresh, and **Add Account…**. Login starts from the bar: CBL shows the device code in the tray menu and opens only the OpenAI confirmation page.
+The GNOME top-bar popup is the primary UI: it shows Codex usage percentages, real progress bars, credits, account/plan info, refresh, and **Add Account…**. Login starts from the bar: CBL shows the device code in the popup and opens only the OpenAI confirmation page.
 
 If you pass `--proxy` to `cbl login`, CBL stores that proxy in `~/.config/cbl/config.json`, so the background service and tray use it for later usage refreshes too.
 
@@ -63,7 +63,7 @@ You can also bake the proxy into the systemd user service during install:
 curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash -s -- --proxy socks5h://127.0.0.1:2080
 ```
 
-If you want the explicit platform installer, `./install/ubuntu/install.sh` does the same thing. To try the GNOME Shell extension too, run `./install.sh --all` or `./install.sh --extension`.
+If you want the explicit platform installer, `./install/ubuntu/install.sh` does the same thing. Use `./install.sh --indicator` only if you explicitly want the AppIndicator fallback.
 
 ### Ubuntu packages
 
@@ -148,15 +148,15 @@ chatgpt_base_url = "https://chatgpt.com/backend-api"
 
 Use the `/waybar` endpoint or `cbl status --waybar`.
 
-### GNOME / Extension Manager (optional)
+### GNOME / Extension Manager
 
 The cleanest pattern is:
 
 1. run `cbl serve` in the background via the systemd user service
-2. let the GNOME Shell extension poll `http://127.0.0.1:18088/waybar`
-3. use the extension's *Add / edit profile…* entry to store `~/.config/cbl/config.json`
+2. let the GNOME Shell extension poll `http://127.0.0.1:18088/api/status`
+3. use the extension's **Add Account…** action to login without the terminal
 
-The default installer intentionally skips the GNOME Shell extension and uses the tray helper. If you want to test the extension later, run `./install.sh --extension` or package it with `./install/ubuntu/package-gnome-extension.sh` and install the zip in Extension Manager.
+The default installer uses the GNOME Shell extension when `gnome-extensions` is available. You can still package it manually with `./install/ubuntu/package-gnome-extension.sh` and install the zip in Extension Manager.
 
 ### AppIndicator / tray
 

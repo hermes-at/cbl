@@ -14,8 +14,9 @@ usage() {
   cat <<'EOF'
 Usage: install.sh [--systemd] [--indicator] [--extension] [--all] [--proxy URL]
 
-Default: install the user service and tray indicator.
-Use --extension if you explicitly want the GNOME Shell extension too.
+Default on GNOME: install the user service and GNOME top-bar extension.
+Default elsewhere: install the user service and tray indicator fallback.
+Use --indicator if you explicitly want the AppIndicator tray helper.
 Use --proxy to bake an HTTP/SOCKS5 proxy into the user service.
 EOF
 }
@@ -27,7 +28,11 @@ want_indicator=0
 component_seen=0
 if [[ $# -eq 0 ]]; then
   want_systemd=1
-  want_indicator=1
+  if command -v gnome-extensions >/dev/null 2>&1; then
+    want_extension=1
+  else
+    want_indicator=1
+  fi
 else
   for arg in "$@"; do
     case "$arg" in
@@ -52,7 +57,11 @@ fi
 
 if [[ "$component_seen" -eq 0 ]]; then
   want_systemd=1
-  want_indicator=1
+  if command -v gnome-extensions >/dev/null 2>&1; then
+    want_extension=1
+  else
+    want_indicator=1
+  fi
 fi
 
 if [[ -z "$proxy" ]]; then
@@ -131,6 +140,12 @@ if [[ "$want_extension" -eq 1 ]]; then
     fi
   else
     echo "Run: gnome-extensions enable cbl@hermes"
+  fi
+  if [[ "$want_indicator" -eq 0 ]]; then
+    rm -f "$AUTOSTART_DIR/cbl-indicator.desktop"
+    if command -v pkill >/dev/null 2>&1; then
+      pkill -xu "$(id -u)" cbl-tray >/dev/null 2>&1 || true
+    fi
   fi
 fi
 
