@@ -2,6 +2,7 @@ import Adw from 'gi://Adw';
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import Gtk from 'gi://Gtk?version=4.0';
+import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 const CONFIG_DIR = GLib.build_filenamev([GLib.get_home_dir(), '.config', 'cbl']);
 const CONFIG_FILE = GLib.build_filenamev([CONFIG_DIR, 'config.json']);
@@ -28,7 +29,7 @@ function defaultAuthPath() {
     return GLib.build_filenamev([GLib.get_home_dir(), '.codex', 'auth.json']);
 }
 
-export default class CblPrefs {
+export default class CblPrefs extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         window.set_title('cbl');
         window.set_default_size(560, 360);

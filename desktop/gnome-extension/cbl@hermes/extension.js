@@ -1,9 +1,9 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
-import Soup from 'gi://Soup';
+import Soup from 'gi://Soup?version=3.0';
 import Clutter from 'gi://Clutter';
-import ExtensionUtils from 'resource:///org/gnome/shell/extensions/extension.js';
+import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import {PanelMenu} from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
@@ -72,10 +72,10 @@ class ProgressCard extends St.BoxLayout {
 }
 
 class CblIndicator extends PanelMenu.Button {
-    _init() {
+    _init(extension) {
         super._init(0.0, 'cbl');
         this._session = Soup.Session.new();
-        this._extension = ExtensionUtils.getCurrentExtension();
+        this._extension = extension;
         this._loginID = '';
 
         this._icon = new St.Icon({
@@ -266,9 +266,9 @@ class CblIndicator extends PanelMenu.Button {
 
 let indicator = null;
 
-export default class CblExtension {
+export default class CblExtension extends Extension {
     enable() {
-        indicator = new CblIndicator();
+        indicator = new CblIndicator(this);
         Main.panel.addToStatusArea('cbl', indicator, 0, 'right');
     }
 
