@@ -117,6 +117,9 @@ fi
 
 if [[ "$want_extension" -eq 1 ]]; then
   echo "[3/4] Installing GNOME Shell extension source"
+  if command -v gnome-extensions >/dev/null 2>&1; then
+    gnome-extensions disable cbl@hermes >/dev/null 2>&1 || true
+  fi
   rm -rf "$EXT_DIR"
   mkdir -p "$EXT_DIR"
   cp -a "$ROOT_DIR/desktop/gnome-extension/cbl@hermes/." "$EXT_DIR/"
