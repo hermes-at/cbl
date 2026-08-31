@@ -4,7 +4,7 @@ import St from 'gi://St';
 import Soup from 'gi://Soup?version=3.0';
 import Clutter from 'gi://Clutter';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
-import {PanelMenu} from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
