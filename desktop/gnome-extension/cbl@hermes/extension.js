@@ -73,6 +73,73 @@ class ProgressCard extends St.BoxLayout {
     }
 });
 
+function accountWorstRemaining(account) {
+    const windows = account?.windows || [];
+    let worst = 100;
+    for (const win of windows) {
+        worst = Math.min(worst, clamp(win?.remaining, 0, 100));
+    }
+    if (!windows.length)
+        return 0;
+    return worst;
+}
+
+function styleFill(fill, remaining) {
+    fill.remove_style_pseudo_class('warning');
+    fill.remove_style_pseudo_class('critical');
+    if (remaining <= 10)
+        fill.add_style_pseudo_class('critical');
+    else if (remaining <= 30)
+        fill.add_style_pseudo_class('warning');
+}
+
+const AccountCard = GObject.registerClass(
+class AccountCard extends St.BoxLayout {
+    _init(account) {
+        super._init({vertical: true, style_class: 'cbl-account-card'});
+
+        const header = new St.BoxLayout({vertical: false, style_class: 'cbl-account-header'});
+        const title = new St.Label({
+            text: shortAccount(account?.account_id),
+            style_class: 'cbl-account-title',
+            x_expand: true,
+        });
+        const status = new St.Label({
+            text: account?.plan || 'unknown',
+            style_class: `cbl-account-status ${account?.class || 'good'}`,
+        });
+        header.add_child(title);
+        header.add_child(status);
+        this.add_child(header);
+
+        const windows = account?.windows || [];
+        this._addMeter('5h', windows[0]);
+        this._addMeter('week', windows[1]);
+        const credits = account?.credits?.text ?? '—';
+        const creditsUsed = clamp(account?.credits?.used, 0, 100);
+        this._addMeter('credits', {remaining: credits === '0.00' ? 0 : 100 - creditsUsed, label: credits});
+    }
+
+    _addMeter(name, data) {
+        const remaining = clamp(data?.remaining, 0, 100);
+        const row = new St.BoxLayout({vertical: false, style_class: 'cbl-meter-row'});
+        const label = new St.Label({text: name, style_class: 'cbl-meter-label'});
+        const track = new St.Widget({style_class: 'cbl-mini-track'});
+        const fill = new St.Widget({style_class: 'cbl-mini-fill'});
+        fill.set_width(Math.max(2, Math.round(160 * remaining / 100)));
+        styleFill(fill, remaining);
+        track.add_child(fill);
+        const value = new St.Label({
+            text: data?.label ? String(data.label) : `${remaining}%`,
+            style_class: 'cbl-meter-value',
+        });
+        row.add_child(label);
+        row.add_child(track);
+        row.add_child(value);
+        this.add_child(row);
+    }
+});
+
 const CblIndicator = GObject.registerClass(
 class CblIndicator extends PanelMenu.Button {
     _init(extension) {
@@ -110,13 +177,6 @@ class CblIndicator extends PanelMenu.Button {
 
         this._accountsBox = new St.BoxLayout({vertical: true, style_class: 'cbl-accounts-box'});
         this._content.add_child(this._accountsBox);
-
-        this._sessionCard = new ProgressCard('Лимит использования 5 часов');
-        this._weeklyCard = new ProgressCard('Недельный лимит использования');
-        this._creditsCard = new ProgressCard('Осталось кредитов');
-        this._content.add_child(this._sessionCard);
-        this._content.add_child(this._weeklyCard);
-        this._content.add_child(this._creditsCard);
 
         this._loginBox = new St.BoxLayout({vertical: true, style_class: 'cbl-login-box'});
         this._loginText = new St.Label({text: 'Вход прямо из top bar: Add Account → подтвердить в браузере → I confirmed login.', style_class: 'cbl-card-meta'});
@@ -199,38 +259,26 @@ class CblIndicator extends PanelMenu.Button {
     }
 
     _applyStatus(payload) {
-        const plan = payload.plan || 'unknown';
-        const account = shortAccount(payload.account_id);
-        this._label.text = payload.windows?.[0]?.remaining ? `${payload.windows[0].remaining}%` : 'cbl';
-        this._icon.gicon = this._stateIcon(payload.class || 'good');
+        const accounts = payload.accounts?.length ? payload.accounts : [payload];
+        let worst = 100;
+        for (const account of accounts)
+            worst = Math.min(worst, accountWorstRemaining(account));
+        const stateClass = worst <= 10 ? 'critical' : worst <= 30 ? 'warning' : 'good';
+        this._label.text = `${worst}%`;
+        this._icon.gicon = this._stateIcon(stateClass);
         this._heading.text = 'Codex';
-        this._subheading.text = `plan: ${plan} · account: ${account}`;
-        this._badge.text = (payload.class || 'good').toUpperCase();
-        this._sessionCard.setData(payload.windows?.[0]);
-        this._weeklyCard.setData(payload.windows?.[1]);
-        const creditsText = payload.credits?.text || '—';
-        this._creditsCard._value.text = creditsText;
-        this._creditsCard._fill.set_width(Math.max(3, Math.round(260 * (100 - clamp(payload.credits?.used, 0, 100)) / 100)));
-        this._creditsCard._meta.text = 'monthly credits';
+        this._subheading.text = `${accounts.length} account${accounts.length === 1 ? '' : 's'} · worst 5h/week ${worst}%`;
+        this._badge.text = stateClass.toUpperCase();
         this._statusItem.label.text = 'Status: OK';
-        this._applyAccounts(payload.accounts || []);
+        this._applyAccounts(accounts);
     }
 
     _applyAccounts(accounts) {
         this._accountsBox.destroy_all_children();
-        if (!accounts || accounts.length <= 1)
+        if (!accounts || !accounts.length)
             return;
         for (const account of accounts) {
-            const windows = account.windows || [];
-            const first = windows[0]?.remaining ?? '—';
-            const weekly = windows[1]?.remaining ?? '—';
-            const credits = account.credits?.text ?? '—';
-            const row = new St.Label({
-                text: `${shortAccount(account.account_id)} · ${account.plan || 'unknown'} · 5h ${first}% · week ${weekly}% · credits ${credits}`,
-                style_class: 'cbl-account-row',
-            });
-            row.clutter_text.line_wrap = true;
-            this._accountsBox.add_child(row);
+            this._accountsBox.add_child(new AccountCard(account));
         }
     }
 
@@ -240,9 +288,6 @@ class CblIndicator extends PanelMenu.Button {
         this._icon.gicon = this._stateIcon('error');
         this._subheading.text = 'service unavailable';
         this._badge.text = 'ERROR';
-        this._sessionCard.setEmpty();
-        this._weeklyCard.setEmpty();
-        this._creditsCard.setEmpty();
         this._accountsBox.destroy_all_children();
         this._statusItem.label.text = `Status: ${message}`;
     }

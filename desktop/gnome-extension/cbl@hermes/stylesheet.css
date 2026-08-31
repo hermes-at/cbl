@@ -29,12 +29,82 @@
   spacing: 6px;
 }
 
-.cbl-account-row {
+.cbl-account-row,
+.cbl-account-card {
   background: #202020;
   border-radius: 12px;
   color: #d8d8df;
   font-size: 12px;
   padding: 8px 10px;
+}
+
+.cbl-account-card {
+  border: 1px solid #323236;
+  spacing: 8px;
+}
+
+.cbl-account-header,
+.cbl-meter-row {
+  spacing: 8px;
+}
+
+.cbl-account-title {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.cbl-account-status {
+  border-radius: 999px;
+  color: #06140c;
+  background-color: #2ed36f;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 7px;
+}
+
+.cbl-account-status.warning {
+  background-color: #f5c542;
+}
+
+.cbl-account-status.critical,
+.cbl-account-status.error {
+  background-color: #ff5c5c;
+}
+
+.cbl-meter-label {
+  color: #a8a8b3;
+  font-size: 11px;
+  font-weight: 700;
+  width: 42px;
+}
+
+.cbl-meter-value {
+  color: #f4f4f5;
+  font-size: 11px;
+  font-weight: 800;
+  width: 48px;
+}
+
+.cbl-mini-track {
+  width: 160px;
+  height: 8px;
+  background-color: #3a3a3f;
+  border-radius: 999px;
+}
+
+.cbl-mini-fill {
+  height: 8px;
+  background-color: #2ed36f;
+  border-radius: 999px;
+}
+
+.cbl-mini-fill:warning {
+  background-color: #f5c542;
+}
+
+.cbl-mini-fill:critical {
+  background-color: #ff5c5c;
 }
 
 .cbl-badge {
