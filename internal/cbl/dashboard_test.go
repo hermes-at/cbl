@@ -34,6 +34,21 @@ func TestDashboardPayloadIncludesBarsAndCredits(t *testing.T) {
 	}
 }
 
+func TestDashboardPayloadIncludesMultipleAccounts(t *testing.T) {
+	snaps := []UsageSnapshot{
+		{AccountID: "acct-1", PlanType: "plus", PrimaryWindow: &UsageWindow{UsedPercent: 10}, SecondaryWindow: &UsageWindow{UsedPercent: 20}},
+		{AccountID: "acct-2", PlanType: "pro", PrimaryWindow: &UsageWindow{UsedPercent: 30}, SecondaryWindow: &UsageWindow{UsedPercent: 40}},
+	}
+	payload := dashboardPayloadAll(snaps, nil)
+	accounts := payload["accounts"].([]map[string]any)
+	if len(accounts) != 2 {
+		t.Fatalf("accounts = %#v", accounts)
+	}
+	if accounts[0]["account_id"] != "acct-1" || accounts[1]["account_id"] != "acct-2" {
+		t.Fatalf("unexpected accounts: %#v", accounts)
+	}
+}
+
 func TestDashboardRouteServesLoginUI(t *testing.T) {
 	mux := http.NewServeMux()
 	state := &cache{}

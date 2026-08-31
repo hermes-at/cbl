@@ -108,6 +108,9 @@ class CblIndicator extends PanelMenu.Button {
         header.add_child(this._badge);
         this._content.add_child(header);
 
+        this._accountsBox = new St.BoxLayout({vertical: true, style_class: 'cbl-accounts-box'});
+        this._content.add_child(this._accountsBox);
+
         this._sessionCard = new ProgressCard('Лимит использования 5 часов');
         this._weeklyCard = new ProgressCard('Недельный лимит использования');
         this._creditsCard = new ProgressCard('Осталось кредитов');
@@ -210,6 +213,25 @@ class CblIndicator extends PanelMenu.Button {
         this._creditsCard._fill.set_width(Math.max(3, Math.round(260 * (100 - clamp(payload.credits?.used, 0, 100)) / 100)));
         this._creditsCard._meta.text = 'monthly credits';
         this._statusItem.label.text = 'Status: OK';
+        this._applyAccounts(payload.accounts || []);
+    }
+
+    _applyAccounts(accounts) {
+        this._accountsBox.destroy_all_children();
+        if (!accounts || accounts.length <= 1)
+            return;
+        for (const account of accounts) {
+            const windows = account.windows || [];
+            const first = windows[0]?.remaining ?? '—';
+            const weekly = windows[1]?.remaining ?? '—';
+            const credits = account.credits?.text ?? '—';
+            const row = new St.Label({
+                text: `${shortAccount(account.account_id)} · ${account.plan || 'unknown'} · 5h ${first}% · week ${weekly}% · credits ${credits}`,
+                style_class: 'cbl-account-row',
+            });
+            row.clutter_text.line_wrap = true;
+            this._accountsBox.add_child(row);
+        }
     }
 
     _applyError(err) {
@@ -221,6 +243,7 @@ class CblIndicator extends PanelMenu.Button {
         this._sessionCard.setEmpty();
         this._weeklyCard.setEmpty();
         this._creditsCard.setEmpty();
+        this._accountsBox.destroy_all_children();
         this._statusItem.label.text = `Status: ${message}`;
     }
 

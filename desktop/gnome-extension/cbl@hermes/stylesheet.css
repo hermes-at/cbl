@@ -25,6 +25,18 @@
   font-size: 12px;
 }
 
+.cbl-accounts-box {
+  spacing: 6px;
+}
+
+.cbl-account-row {
+  background: #202020;
+  border-radius: 12px;
+  color: #d8d8df;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+
 .cbl-badge {
   color: #06140c;
   background-color: #2ed36f;

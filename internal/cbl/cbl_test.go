@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,6 +39,30 @@ func TestLoadCredentialsFromConfigAuthFile(t *testing.T) {
 	}
 	if creds.AccessToken != "a" || creds.RefreshToken != "r" || creds.AccountID != "acct-1" {
 		t.Fatalf("unexpected creds: %#v", creds)
+	}
+}
+
+func TestSaveAccountCredentialsAddsAccountFile(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("CODEX_HOME", "")
+	path, err := saveAccountCredentials(Credentials{AccessToken: "a", RefreshToken: "r", AccountID: "acct/new"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(path, filepath.Join(".config", "cbl", "accounts", "acct_new.json")) {
+		t.Fatalf("path = %q", path)
+	}
+	files := accountAuthFiles()
+	if len(files) != 1 || files[0] != path {
+		t.Fatalf("files = %#v, want %q", files, path)
+	}
+	creds, err := loadCredentials(Options{AuthFile: path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if creds.AccountID != "acct/new" || creds.AccessToken != "a" {
+		t.Fatalf("creds = %#v", creds)
 	}
 }
 
@@ -113,6 +139,47 @@ func TestMapSnapshotFromRateLimitResponse(t *testing.T) {
 	}
 	if len(snap.AdditionalRates) != 1 || snap.AdditionalRates[0].Name != "GPT-5.3-Codex-Spark" {
 		t.Fatalf("unexpected additional: %#v", snap.AdditionalRates)
+	}
+}
+
+func TestLoadAllFetchesSavedAccounts(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("CODEX_HOME", "")
+	_, err := saveAccountCredentials(Credentials{AccessToken: "access-1", RefreshToken: "r1", AccountID: "acct-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = saveAccountCredentials(Credentials{AccessToken: "access-2", RefreshToken: "r2", AccountID: "acct-2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/wham/usage" {
+			http.NotFound(w, r)
+			return
+		}
+		acct := r.Header.Get("ChatGPT-Account-Id")
+		used := 10
+		if acct == "acct-2" {
+			used = 40
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"account_id": acct,
+			"plan_type":  "plus",
+			"rate_limit": map[string]any{"primary_window": map[string]any{"used_percent": used}},
+		})
+	}))
+	defer server.Close()
+	snaps, err := LoadAll(context.Background(), Options{BaseURL: server.URL + "/backend-api"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snaps) != 2 {
+		t.Fatalf("snaps = %#v", snaps)
+	}
+	if snaps[0].AccountID != "acct-1" || snaps[0].PrimaryWindow.Remaining() != 90 || snaps[1].AccountID != "acct-2" || snaps[1].PrimaryWindow.Remaining() != 60 {
+		t.Fatalf("unexpected snaps: %#v", snaps)
 	}
 }
 

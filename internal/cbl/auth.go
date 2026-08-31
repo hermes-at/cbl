@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -85,6 +86,58 @@ func loadCredentialsWithPath(opts Options) (Credentials, string, error) {
 
 func defaultCBLAuthFile() string {
 	return filepath.Join(mustHome(), ".config", "cbl", "auth.json")
+}
+
+func cblAccountsDir() string {
+	return filepath.Join(mustHome(), ".config", "cbl", "accounts")
+}
+
+func saveAccountCredentials(creds Credentials) (string, error) {
+	name := strings.TrimSpace(creds.AccountID)
+	if name == "" {
+		name = "account"
+	}
+	name = safeFileName(name)
+	path := filepath.Join(cblAccountsDir(), name+".json")
+	return path, saveCredentials(path, creds)
+}
+
+func accountAuthFiles() []string {
+	paths := []string{}
+	seen := map[string]bool{}
+	for _, path := range defaultAuthFileCandidates() {
+		if _, err := os.Stat(path); err == nil && !seen[path] {
+			paths = append(paths, path)
+			seen[path] = true
+		}
+	}
+	matches, _ := filepath.Glob(filepath.Join(cblAccountsDir(), "*.json"))
+	sort.Strings(matches)
+	for _, path := range matches {
+		if !seen[path] {
+			paths = append(paths, path)
+			seen[path] = true
+		}
+	}
+	return paths
+}
+
+func safeFileName(s string) string {
+	s = strings.TrimSpace(s)
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_', r == '.':
+			b.WriteRune(r)
+		default:
+			b.WriteRune('_')
+		}
+	}
+	out := strings.Trim(b.String(), ".")
+	if out == "" {
+		return "account"
+	}
+	return out
 }
 
 func defaultAuthFileCandidates() []string {

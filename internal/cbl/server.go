@@ -10,15 +10,29 @@ import (
 )
 
 type cache struct {
-	mu   sync.RWMutex
-	snap UsageSnapshot
-	err  error
+	mu    sync.RWMutex
+	snap  UsageSnapshot
+	snaps []UsageSnapshot
+	err   error
 }
 
 func (c *cache) set(s UsageSnapshot, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.snap = s
+	c.snaps = []UsageSnapshot{s}
+	c.err = err
+}
+
+func (c *cache) setAll(snaps []UsageSnapshot, err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.snaps = append([]UsageSnapshot(nil), snaps...)
+	if len(snaps) > 0 {
+		c.snap = snaps[0]
+	} else {
+		c.snap = UsageSnapshot{}
+	}
 	c.err = err
 }
 
@@ -26,6 +40,12 @@ func (c *cache) get() (UsageSnapshot, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.snap, c.err
+}
+
+func (c *cache) getAll() ([]UsageSnapshot, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return append([]UsageSnapshot(nil), c.snaps...), c.err
 }
 
 func Watch(ctx context.Context, interval time.Duration, opts Options, out ioWriter) error {
@@ -56,8 +76,8 @@ func Watch(ctx context.Context, interval time.Duration, opts Options, out ioWrit
 func Serve(ctx context.Context, addr string, interval time.Duration, opts Options) error {
 	state := &cache{}
 	refresh := func() {
-		snap, err := Load(ctx, opts)
-		state.set(snap, err)
+		snaps, err := LoadAll(ctx, opts)
+		state.setAll(snaps, err)
 	}
 	refresh()
 	go func() {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -53,7 +54,7 @@ func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 	})
 	mux.HandleFunc("/dashboard", handleDashboard)
 	mux.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, dashboardPayload(state.get()))
+		writeJSON(w, http.StatusOK, dashboardPayloadAll(state.getAll()))
 	})
 	mux.HandleFunc("/api/login/start", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -105,10 +106,13 @@ func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
 			return
 		}
-		path := defaultCBLAuthFile()
-		if err := saveCredentials(path, creds); err != nil {
+		path, err := saveAccountCredentials(creds)
+		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
 			return
+		}
+		if _, err := os.Stat(defaultCBLAuthFile()); os.IsNotExist(err) {
+			_ = saveCredentials(defaultCBLAuthFile(), creds)
 		}
 		if err := saveUserProxy(resolvedProxy(proxy)); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
@@ -117,8 +121,8 @@ func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 			defer cancel()
-			snap, err := Load(ctx, opts)
-			state.set(snap, err)
+			snaps, err := LoadAll(ctx, opts)
+			state.setAll(snaps, err)
 		}()
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "auth_file": path})
 	})
@@ -136,11 +140,21 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func dashboardPayload(snap UsageSnapshot, err error) map[string]any {
+	return dashboardPayloadAll([]UsageSnapshot{snap}, err)
+}
+
+func dashboardPayloadAll(snaps []UsageSnapshot, err error) map[string]any {
 	payload := map[string]any{"ok": err == nil}
 	if err != nil {
 		payload["error"] = err.Error()
 		return payload
 	}
+	if len(snaps) == 0 {
+		payload["ok"] = false
+		payload["error"] = "no usage data available"
+		return payload
+	}
+	snap := snaps[0]
 	payload["text"] = snap.summaryLine()
 	payload["tooltip"] = snap.tooltip()
 	payload["class"] = snap.waybarClass()
@@ -150,7 +164,22 @@ func dashboardPayload(snap UsageSnapshot, err error) map[string]any {
 	payload["fetched_at"] = snap.FetchedAt
 	payload["windows"] = usageCards(snap)
 	payload["credits"] = creditCard(snap)
+	accounts := make([]map[string]any, 0, len(snaps))
+	for _, account := range snaps {
+		accounts = append(accounts, accountCard(account))
+	}
+	payload["accounts"] = accounts
 	return payload
+}
+
+func accountCard(snap UsageSnapshot) map[string]any {
+	return map[string]any{
+		"account_id": snap.AccountID,
+		"plan":       snap.PlanType,
+		"class":      snap.waybarClass(),
+		"windows":    usageCards(snap),
+		"credits":    creditCard(snap),
+	}
 }
 
 func usageCards(snap UsageSnapshot) []map[string]any {

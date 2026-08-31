@@ -106,6 +106,79 @@ func Load(ctx context.Context, opts Options) (UsageSnapshot, error) {
 	return snap, nil
 }
 
+func LoadAll(ctx context.Context, opts Options) ([]UsageSnapshot, error) {
+	if strings.TrimSpace(opts.AuthFile) != "" || strings.TrimSpace(os.Getenv("CBL_AUTH_FILE")) != "" || strings.TrimSpace(opts.Fixture) != "" || strings.TrimSpace(os.Getenv("CBL_FIXTURE")) != "" {
+		snap, err := Load(ctx, opts)
+		if err != nil {
+			return nil, err
+		}
+		return []UsageSnapshot{snap}, nil
+	}
+	files := accountAuthFiles()
+	if len(files) == 0 {
+		snap, err := Load(ctx, opts)
+		if err != nil {
+			return nil, err
+		}
+		return []UsageSnapshot{snap}, nil
+	}
+	baseURL := loadBaseURL(opts)
+	proxy := loadProxy(opts)
+	client, err := newHTTPClient(proxy)
+	if err != nil {
+		return nil, err
+	}
+	snaps := []UsageSnapshot{}
+	seen := map[string]bool{}
+	var firstErr error
+	for _, path := range files {
+		creds, err := loadCredentials(Options{AuthFile: path, ConfigFile: opts.ConfigFile, BaseURL: opts.BaseURL, Proxy: opts.Proxy})
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		key := creds.AccountID
+		if key == "" {
+			key = path
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		snap, err := fetchUsage(ctx, client, creds, baseURL)
+		if err != nil {
+			var usageErr *UsageHTTPError
+			if !creds.IsAPIKey && errors.As(err, &usageErr) && usageErr.StatusCode == http.StatusUnauthorized {
+				refreshed, refreshErr := RefreshCredentials(ctx, client, path, creds)
+				if refreshErr == nil {
+					creds = refreshed
+					snap, err = fetchUsage(ctx, client, creds, baseURL)
+				} else {
+					err = fmt.Errorf("%w; token refresh also failed: %v", err, refreshErr)
+				}
+			}
+		}
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		snap.ProfileName = loadUserConfig(opts).ProfileName
+		snap.Proxy = proxy
+		snaps = append(snaps, snap)
+	}
+	if len(snaps) == 0 {
+		if firstErr != nil {
+			return nil, firstErr
+		}
+		return nil, fmt.Errorf("no usable CBL accounts found")
+	}
+	return snaps, nil
+}
+
 func loadProxy(opts Options) string {
 	if proxy := strings.TrimSpace(opts.Proxy); proxy != "" {
 		return proxy

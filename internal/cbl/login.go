@@ -81,6 +81,7 @@ func RunDeviceLogin(ctx context.Context, opts LoginOptions) (string, error) {
 	if err := saveCredentials(path, creds); err != nil {
 		return "", err
 	}
+	_, _ = saveAccountCredentials(creds)
 	if err := saveUserProxy(resolvedProxy(opts.Proxy)); err != nil {
 		return "", err
 	}
