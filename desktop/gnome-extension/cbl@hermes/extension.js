@@ -1,5 +1,6 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import St from 'gi://St';
 import Soup from 'gi://Soup?version=3.0';
 import Clutter from 'gi://Clutter';
@@ -35,9 +36,10 @@ function decodeBytes(bytes) {
     return new TextDecoder().decode(bytes.get_data());
 }
 
+const ProgressCard = GObject.registerClass(
 class ProgressCard extends St.BoxLayout {
-    constructor(title) {
-        super({vertical: true, style_class: 'cbl-card'});
+    _init(title) {
+        super._init({vertical: true, style_class: 'cbl-card'});
         this._title = new St.Label({text: title, style_class: 'cbl-card-title'});
         this._value = new St.Label({text: '—', style_class: 'cbl-card-value'});
         this._track = new St.Widget({style_class: 'cbl-progress-track', x_expand: true});
@@ -69,8 +71,9 @@ class ProgressCard extends St.BoxLayout {
         this._fill.set_width(3);
         this._meta.text = 'нет данных';
     }
-}
+});
 
+const CblIndicator = GObject.registerClass(
 class CblIndicator extends PanelMenu.Button {
     _init(extension) {
         super._init(0.0, 'cbl');
@@ -262,7 +265,7 @@ class CblIndicator extends PanelMenu.Button {
         const iconPath = this._extension.dir.get_child('assets').get_child('cbl-symbolic.svg').get_path();
         return new Gio.FileIcon({file: Gio.File.new_for_path(iconPath)});
     }
-}
+});
 
 let indicator = null;
 
