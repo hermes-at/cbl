@@ -290,7 +290,7 @@ class CblIndicator extends PanelMenu.Button {
             this._label.text = 'cbl';
             this._icon.gicon = this._stateIcon('good');
             this._heading.text = 'Codex';
-            this._subheading.text = 'лимиты Codex';
+            this._subheading.text = 'limits';
             this._badge.hide();
             this._statusItem.label.text = 'Status: waiting for first account';
             this._showNoAccounts();
@@ -318,10 +318,7 @@ class CblIndicator extends PanelMenu.Button {
         this._accountsBox.destroy_all_children();
         const box = new St.BoxLayout({vertical: true, style_class: 'cbl-empty-card'});
         const title = new St.Label({text: 'Аккаунтов: 0', style_class: 'cbl-empty-title'});
-        const text = new St.Label({text: 'Нажми «Добавить аккаунт…» ниже, подтверди вход в браузере, потом нажми «Я подтвердил вход».', style_class: 'cbl-empty-text'});
-        text.clutter_text.line_wrap = true;
         box.add_child(title);
-        box.add_child(text);
         this._accountsBox.add_child(box);
     }
 
