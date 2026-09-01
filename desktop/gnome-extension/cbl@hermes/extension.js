@@ -146,6 +146,7 @@ class AccountCard extends St.BoxLayout {
         const track = new St.Widget({style_class: 'cbl-mini-track'});
         const fill = new St.Widget({style_class: 'cbl-mini-fill', y_align: Clutter.ActorAlign.CENTER});
         fill.set_width(Math.max(2, Math.round(160 * remaining / 100)));
+        fill.set_position(0, 1);
         styleFill(fill, remaining);
         track.add_child(fill);
         const value = new St.Label({
@@ -172,9 +173,8 @@ class CblIndicator extends PanelMenu.Button {
             gicon: this._loadIcon('assets/cbl-symbolic.svg'),
             style_class: 'system-status-icon',
         });
-        this._label = new St.Label({text: 'cbl', y_align: Clutter.ActorAlign.CENTER});
+        this._label = new St.Label({text: '•••', y_align: Clutter.ActorAlign.CENTER});
         this._box = new St.BoxLayout({style_class: 'panel-status-menu-box'});
-        this._box.add_child(this._icon);
         this._box.add_child(this._label);
         this.add_child(this._box);
 
@@ -213,11 +213,6 @@ class CblIndicator extends PanelMenu.Button {
         this._codeItem.setSensitive(false);
         this._codeItem.connect('activate', () => this._copyLoginCode());
         this.menu.addMenuItem(this._codeItem);
-
-        this._copyCodeItem = new PopupMenu.PopupMenuItem('📋 Скопировать код');
-        this._copyCodeItem.setSensitive(false);
-        this._copyCodeItem.connect('activate', () => this._copyLoginCode());
-        this.menu.addMenuItem(this._copyCodeItem);
 
         this._completeLoginItem = new PopupMenu.PopupMenuItem('✓ Я подтвердил вход');
         this._completeLoginItem.setSensitive(false);
@@ -287,11 +282,12 @@ class CblIndicator extends PanelMenu.Button {
     _applyStatus(payload) {
         const accounts = payload.accounts || [];
         if (!accounts.length) {
-            this._label.text = 'cbl';
+            this._label.text = '•••';
             this._icon.gicon = this._stateIcon('good');
             this._heading.text = 'Codex';
             this._subheading.text = 'limits';
             this._badge.hide();
+            this._loginBox.show();
             this._statusItem.label.text = 'Status: waiting for first account';
             this._showNoAccounts();
             return;
@@ -300,16 +296,12 @@ class CblIndicator extends PanelMenu.Button {
         for (const account of accounts)
             worst = Math.min(worst, accountWorstRemaining(account));
         const stateClass = worst <= 10 ? 'critical' : worst <= 30 ? 'warning' : 'good';
-        this._label.text = `${worst}%`;
+        this._label.text = '•••';
         this._icon.gicon = this._stateIcon(stateClass);
         this._heading.text = 'Codex';
-        this._subheading.text = `${accounts.length} ${accounts.length === 1 ? 'профиль' : 'профиля'} · минимум ${worst}%`;
-        if (stateClass === 'good') {
-            this._badge.hide();
-        } else {
-            this._badge.text = stateClass === 'critical' ? 'МАЛО' : 'НИЗКО';
-            this._badge.show();
-        }
+        this._subheading.text = `${accounts.length} ${accounts.length === 1 ? 'профиль' : 'профиля'}`;
+        this._badge.hide();
+        this._loginBox.hide();
         this._statusItem.label.text = 'Status: OK';
         this._applyAccounts(accounts);
     }
@@ -333,7 +325,7 @@ class CblIndicator extends PanelMenu.Button {
 
     _applyError(err) {
         const message = err?.message ?? String(err);
-        this._label.text = '!';
+        this._label.text = '•••';
         this._icon.gicon = this._stateIcon('error');
         this._subheading.text = 'service unavailable';
         this._badge.text = 'ERROR';
@@ -345,7 +337,7 @@ class CblIndicator extends PanelMenu.Button {
     _startLogin() {
         this._latestUserCode = '';
         this._codeItem.setSensitive(false);
-        this._copyCodeItem.setSensitive(false);
+        this._loginBox.show();
         this._codeItem.label.text = 'Запрашиваю код…';
         this._getJSON(LOGIN_START_URL, 'POST', (payload, err) => {
             if (err || !payload?.ok) {
@@ -357,11 +349,10 @@ class CblIndicator extends PanelMenu.Button {
             this._latestUserCode = payload.user_code || '';
             this._codeItem.label.text = `Код: ${payload.user_code}`;
             this._codeItem.setSensitive(true);
-            this._copyCodeItem.setSensitive(true);
             const copied = copyText(this._latestUserCode);
             this._loginText.text = copied
                 ? `Открыл страницу OpenAI. Код ${payload.user_code} уже скопирован в буфер. Вставь его в браузере, потом нажми «Я подтвердил вход».`
-                : `Открыл страницу OpenAI. Нажми «Скопировать код», вставь код ${payload.user_code} в браузере, потом нажми «Я подтвердил вход».`;
+                : `Открыл страницу OpenAI. Нажми строку «Код», вставь код ${payload.user_code} в браузере, потом нажми «Я подтвердил вход».`;
             this._completeLoginItem.setSensitive(true);
             openURL(payload.verification_url);
         });
@@ -371,9 +362,7 @@ class CblIndicator extends PanelMenu.Button {
         if (!this._latestUserCode)
             return;
         if (copyText(this._latestUserCode))
-            this._copyCodeItem.label.text = '📋 Код скопирован';
-        else
-            this._copyCodeItem.label.text = '📋 Не удалось скопировать';
+            this._codeItem.label.text = `Код скопирован: ${this._latestUserCode}`;
     }
 
     _completeLogin() {
@@ -389,9 +378,8 @@ class CblIndicator extends PanelMenu.Button {
             this._latestUserCode = '';
             this._codeItem.label.text = 'Login saved';
             this._codeItem.setSensitive(false);
-            this._copyCodeItem.label.text = '📋 Скопировать код';
-            this._copyCodeItem.setSensitive(false);
-            this._loginText.text = 'Аккаунт добавлен. CBL обновляет лимиты.';
+            this._loginText.text = '';
+            this._loginBox.hide();
             this._completeLoginItem.setSensitive(false);
             this.refresh();
         });
