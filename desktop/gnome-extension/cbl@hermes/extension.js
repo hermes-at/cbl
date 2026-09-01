@@ -13,7 +13,7 @@ const STATUS_URL = 'http://127.0.0.1:18088/api/status';
 const LOGIN_START_URL = 'http://127.0.0.1:18088/api/login/start';
 const LOGIN_COMPLETE_URL = 'http://127.0.0.1:18088/api/login/complete';
 const REFRESH_SECONDS = 60;
-const MANUAL_REFRESH_COOLDOWN_MS = 3000;
+const MANUAL_REFRESH_COOLDOWN_MS = 5000;
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, Number(value) || 0));
@@ -148,12 +148,13 @@ class AccountCard extends St.BoxLayout {
             style_class: 'cbl-mini-track',
             layout_manager: new Clutter.FixedLayout(),
         });
+        track.set_size(160, 8);
         const fill = new St.Widget({
             style_class: 'cbl-mini-fill',
             x_align: Clutter.ActorAlign.START,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        fill.set_width(Math.max(2, Math.round(160 * remaining / 100)));
+        fill.set_size(Math.max(2, Math.round(160 * remaining / 100)), 8);
         fill.set_position(0, 0);
         styleFill(fill, remaining);
         track.add_child(fill);
@@ -179,6 +180,8 @@ class CblIndicator extends PanelMenu.Button {
         this._refreshing = false;
         this._refreshTimeoutId = 0;
         this._lastManualRefreshAt = 0;
+        this._manualCooldownId = 0;
+        this._manualCooldownUntil = 0;
         this._nextRefreshSeconds = REFRESH_SECONDS;
 
         this._icon = new St.Icon({
@@ -211,9 +214,8 @@ class CblIndicator extends PanelMenu.Button {
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        this._headerRefresh.connect('button-release-event', () => {
+        this._headerRefresh.connect('clicked', () => {
             this._manualRefresh();
-            return Clutter.EVENT_STOP;
         });
         this._badge = new St.Label({text: 'CBL', style_class: 'cbl-badge'});
         header.add_child(titleBox);
@@ -283,6 +285,10 @@ class CblIndicator extends PanelMenu.Button {
             GLib.Source.remove(this._refreshTimeoutId);
             this._refreshTimeoutId = 0;
         }
+        if (this._manualCooldownId) {
+            GLib.Source.remove(this._manualCooldownId);
+            this._manualCooldownId = 0;
+        }
         super.destroy();
     }
 
@@ -311,13 +317,25 @@ class CblIndicator extends PanelMenu.Button {
 
     _manualRefresh() {
         const now = Date.now();
-        const waitMs = MANUAL_REFRESH_COOLDOWN_MS - (now - this._lastManualRefreshAt);
+        const waitMs = this._manualCooldownUntil - now;
         if (waitMs > 0) {
             if (this._statusItem)
                 this._statusItem.label.text = `Status: wait ${Math.ceil(waitMs / 1000)}s before refresh`;
             return;
         }
         this._lastManualRefreshAt = now;
+        this._manualCooldownUntil = now + MANUAL_REFRESH_COOLDOWN_MS;
+        if (this._manualCooldownId)
+            GLib.Source.remove(this._manualCooldownId);
+        if (this._headerRefresh)
+            this._headerRefresh.label = '⟳';
+        this._manualCooldownId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, MANUAL_REFRESH_COOLDOWN_MS, () => {
+            this._manualCooldownId = 0;
+            if (!this._refreshing && this._headerRefresh)
+                this._headerRefresh.label = '↻';
+            this._setIdleStatus();
+            return GLib.SOURCE_REMOVE;
+        });
         this.refresh(true);
     }
 
@@ -349,7 +367,7 @@ class CblIndicator extends PanelMenu.Button {
                 this._refreshing = false;
                 this._nextRefreshSeconds = REFRESH_SECONDS;
                 if (this._headerRefresh) {
-                    this._headerRefresh.label = '↻';
+                    this._headerRefresh.label = Date.now() < this._manualCooldownUntil ? '⟳' : '↻';
                 }
                 if (err) {
                     this._applyError(err);
