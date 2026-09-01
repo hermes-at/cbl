@@ -104,14 +104,54 @@ function accountWorstRemaining(account) {
     return worst;
 }
 
-function styleFill(fill, remaining) {
-    fill.remove_style_pseudo_class('warning');
-    fill.remove_style_pseudo_class('critical');
+function meterColor(remaining) {
     if (remaining <= 10)
-        fill.add_style_pseudo_class('critical');
-    else if (remaining <= 30)
-        fill.add_style_pseudo_class('warning');
+        return [1.0, 0.36, 0.36, 1.0];
+    if (remaining <= 30)
+        return [0.96, 0.77, 0.26, 1.0];
+    return [0.18, 0.83, 0.44, 1.0];
 }
+
+function roundedRect(cr, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    cr.newSubPath();
+    cr.arc(x + width - r, y + r, r, -Math.PI / 2, 0);
+    cr.arc(x + width - r, y + height - r, r, 0, Math.PI / 2);
+    cr.arc(x + r, y + height - r, r, Math.PI / 2, Math.PI);
+    cr.arc(x + r, y + r, r, Math.PI, 3 * Math.PI / 2);
+    cr.closePath();
+}
+
+const MiniMeter = GObject.registerClass(
+class MiniMeter extends St.DrawingArea {
+    _init(remaining) {
+        super._init({style_class: 'cbl-mini-meter'});
+        this._remaining = clamp(remaining, 0, 100);
+        this.set_size(160, 8);
+        this.connect('repaint', () => this._repaint());
+    }
+
+    _repaint() {
+        const cr = this.get_context();
+        try {
+            let [width, height] = this.get_surface_size();
+            width = width || 160;
+            height = height || 8;
+            roundedRect(cr, 0, 0, width, height, height / 2);
+            cr.setSourceRGBA(0.23, 0.23, 0.25, 1.0);
+            cr.fill();
+
+            const fillWidth = this._remaining <= 0
+                ? 2
+                : Math.max(2, Math.round(width * this._remaining / 100));
+            roundedRect(cr, 0, 0, fillWidth, height, height / 2);
+            cr.setSourceRGBA(...meterColor(this._remaining));
+            cr.fill();
+        } finally {
+            cr.$dispose();
+        }
+    }
+});
 
 const AccountCard = GObject.registerClass(
 class AccountCard extends St.BoxLayout {
@@ -144,20 +184,7 @@ class AccountCard extends St.BoxLayout {
         const remaining = clamp(data?.remaining, 0, 100);
         const row = new St.BoxLayout({vertical: false, style_class: 'cbl-meter-row'});
         const label = new St.Label({text: name, style_class: 'cbl-meter-label'});
-        const track = new St.Widget({
-            style_class: 'cbl-mini-track',
-            layout_manager: new Clutter.FixedLayout(),
-        });
-        track.set_size(160, 8);
-        const fill = new St.Widget({
-            style_class: 'cbl-mini-fill',
-            x_align: Clutter.ActorAlign.START,
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        fill.set_size(Math.max(2, Math.round(160 * remaining / 100)), 8);
-        fill.set_position(0, 0);
-        styleFill(fill, remaining);
-        track.add_child(fill);
+        const track = new MiniMeter(remaining);
         const value = new St.Label({
             text: data?.label ? String(data.label) : `${remaining}%`,
             style_class: 'cbl-meter-value',

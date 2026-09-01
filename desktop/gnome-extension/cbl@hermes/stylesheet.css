@@ -107,26 +107,9 @@
   width: 48px;
 }
 
-.cbl-mini-track {
+.cbl-mini-meter {
   width: 160px;
   height: 8px;
-  background-color: #3a3a3f;
-  border-radius: 999px;
-  padding: 0;
-}
-
-.cbl-mini-fill {
-  height: 8px;
-  background-color: #2ed36f;
-  border-radius: 999px;
-}
-
-.cbl-mini-fill:warning {
-  background-color: #f5c542;
-}
-
-.cbl-mini-fill:critical {
-  background-color: #ff5c5c;
 }
 
 .cbl-badge {
