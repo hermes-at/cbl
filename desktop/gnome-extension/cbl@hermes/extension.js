@@ -153,7 +153,7 @@ class AccountCard extends St.BoxLayout {
             y_align: Clutter.ActorAlign.CENTER,
         });
         fill.set_width(Math.max(2, Math.round(160 * remaining / 100)));
-        fill.set_position(0, 1);
+        fill.set_position(0, 2);
         styleFill(fill, remaining);
         track.add_child(fill);
         const value = new St.Label({
@@ -319,7 +319,6 @@ class CblIndicator extends PanelMenu.Button {
         let finished = false;
         if (this._headerRefresh) {
             this._headerRefresh.label = '⟳';
-            this._headerRefresh.set_reactive(false);
         }
         if (this._statusItem)
             this._statusItem.label.text = 'Status: refreshing…';
@@ -337,7 +336,6 @@ class CblIndicator extends PanelMenu.Button {
                 this._nextRefreshSeconds = REFRESH_SECONDS;
                 if (this._headerRefresh) {
                     this._headerRefresh.label = '↻';
-                    this._headerRefresh.set_reactive(true);
                 }
                 if (err) {
                     this._applyError(err);
