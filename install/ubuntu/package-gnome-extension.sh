@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT_DIR="${1:-$ROOT_DIR/dist}"
 ZIP_PATH="${OUT_DIR}/cbl-gnome-extension.zip"
-EXT_SRC="$ROOT_DIR/desktop/gnome-extension/cbl@hermes"
+EXT_SRC="$ROOT_DIR/desktop/gnome-extension/cbl@codex-limits"
 
 mkdir -p "$OUT_DIR"
 python3 - <<'PY' "$EXT_SRC" "$ZIP_PATH"

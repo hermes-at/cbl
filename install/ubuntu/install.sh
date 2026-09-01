@@ -6,7 +6,10 @@ BIN_NAME="cbl"
 INSTALL_BIN="${HOME}/.local/bin/${BIN_NAME}"
 TRAY_BIN="${HOME}/.local/bin/cbl-tray"
 SYSTEMD_DIR="${HOME}/.config/systemd/user"
-EXT_DIR="${HOME}/.local/share/gnome-shell/extensions/cbl@hermes"
+EXT_UUID="cbl@codex-limits"
+OLD_EXT_UUID="cbl@hermes"
+EXT_DIR="${HOME}/.local/share/gnome-shell/extensions/${EXT_UUID}"
+OLD_EXT_DIR="${HOME}/.local/share/gnome-shell/extensions/${OLD_EXT_UUID}"
 TRAY_DIR="${HOME}/.local/share/cbl"
 AUTOSTART_DIR="${HOME}/.config/autostart"
 
@@ -118,11 +121,13 @@ fi
 if [[ "$want_extension" -eq 1 ]]; then
   echo "[3/4] Installing GNOME Shell extension source"
   if command -v gnome-extensions >/dev/null 2>&1; then
-    gnome-extensions disable cbl@hermes >/dev/null 2>&1 || true
+    gnome-extensions disable "$EXT_UUID" >/dev/null 2>&1 || true
+    gnome-extensions disable "$OLD_EXT_UUID" >/dev/null 2>&1 || true
+    gnome-extensions uninstall "$OLD_EXT_UUID" >/dev/null 2>&1 || true
   fi
-  rm -rf "$EXT_DIR"
+  rm -rf "$EXT_DIR" "$OLD_EXT_DIR"
   mkdir -p "$EXT_DIR"
-  cp -a "$ROOT_DIR/desktop/gnome-extension/cbl@hermes/." "$EXT_DIR/"
+  cp -a "$ROOT_DIR/desktop/gnome-extension/${EXT_UUID}/." "$EXT_DIR/"
   find "$EXT_DIR" -type d -exec chmod 0755 {} +
   find "$EXT_DIR" -type f -exec chmod 0644 {} +
   echo "GNOME extension files are in: $EXT_DIR"
@@ -131,18 +136,18 @@ if [[ "$want_extension" -eq 1 ]]; then
     if "$ROOT_DIR/install/ubuntu/package-gnome-extension.sh" "$package_dir" >/dev/null 2>&1; then
       package_zip="$package_dir/cbl-gnome-extension.zip"
       gnome-extensions install --force "$package_zip" || true
-      gnome-extensions enable cbl@hermes || true
-      if gnome-extensions list --enabled 2>/dev/null | grep -Fxq 'cbl@hermes'; then
-        echo "GNOME extension enabled: cbl@hermes"
+      gnome-extensions enable "$EXT_UUID" || true
+      if gnome-extensions list --enabled 2>/dev/null | grep -Fxq "$EXT_UUID"; then
+        echo "GNOME extension enabled: $EXT_UUID"
       else
-        echo "Run: gnome-extensions enable cbl@hermes"
+        echo "Run: gnome-extensions enable $EXT_UUID"
       fi
       rm -rf "$package_dir"
     else
       echo "Could not package GNOME extension; run: $ROOT_DIR/install/ubuntu/package-gnome-extension.sh"
     fi
   else
-    echo "Run: gnome-extensions enable cbl@hermes"
+    echo "Run: gnome-extensions enable $EXT_UUID"
   fi
   if [[ "$want_indicator" -eq 0 ]]; then
     rm -f "$AUTOSTART_DIR/cbl-indicator.desktop"
