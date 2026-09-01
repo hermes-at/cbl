@@ -74,7 +74,7 @@ class ProgressCard extends St.BoxLayout {
     setData(card) {
         const remaining = clamp(card?.remaining, 0, 100);
         const used = clamp(card?.used, 0, 100);
-        this._value.text = `${remaining}% осталось`;
+        this._value.text = `${remaining}% left`;
         this._fill.set_width(Math.max(3, Math.round(260 * remaining / 100)));
         this._fill.remove_style_pseudo_class('warning');
         this._fill.remove_style_pseudo_class('critical');
@@ -88,7 +88,7 @@ class ProgressCard extends St.BoxLayout {
     setEmpty() {
         this._value.text = '—';
         this._fill.set_width(3);
-        this._meta.text = 'нет данных';
+        this._meta.text = 'no data';
     }
 });
 
@@ -176,6 +176,7 @@ class CblIndicator extends PanelMenu.Button {
         this._loginID = '';
         this._latestUserCode = '';
         this._refreshing = false;
+        this._nextRefreshSeconds = REFRESH_SECONDS;
 
         this._icon = new St.Icon({
             gicon: this._loadIcon('assets/cbl-symbolic.svg'),
@@ -195,7 +196,7 @@ class CblIndicator extends PanelMenu.Button {
         const header = new St.BoxLayout({vertical: false, style_class: 'cbl-header'});
         const titleBox = new St.BoxLayout({vertical: true, x_expand: true});
         this._heading = new St.Label({text: 'Codex', style_class: 'cbl-heading'});
-        this._subheading = new St.Label({text: 'загрузка…', style_class: 'cbl-subheading'});
+        this._subheading = new St.Label({text: 'loading…', style_class: 'cbl-subheading'});
         titleBox.add_child(this._heading);
         titleBox.add_child(this._subheading);
         this._headerRefresh = new St.Button({
@@ -207,13 +208,13 @@ class CblIndicator extends PanelMenu.Button {
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        this._headerRefresh.connect('clicked', () => this.refresh());
+        this._headerRefresh.connect('clicked', () => this.refresh(true));
         this._headerRefresh.connect('button-press-event', () => {
-            this.refresh();
+            this.refresh(true);
             return Clutter.EVENT_STOP;
         });
         this._headerRefresh.connect('button-release-event', () => {
-            this.refresh();
+            this.refresh(true);
             return Clutter.EVENT_STOP;
         });
         this._badge = new St.Label({text: 'CBL', style_class: 'cbl-badge'});
@@ -226,13 +227,13 @@ class CblIndicator extends PanelMenu.Button {
         this._content.add_child(this._accountsBox);
 
         this._loginBox = new St.BoxLayout({vertical: true, style_class: 'cbl-login-box'});
-        this._loginText = new St.Label({text: 'Чтобы добавить аккаунт: нажми «Добавить аккаунт…», подтверди вход в браузере, потом нажми «Я подтвердил вход».', style_class: 'cbl-card-meta'});
+        this._loginText = new St.Label({text: 'To add an account: click “Add Account…”, confirm in the browser, then click “I confirmed login”.', style_class: 'cbl-card-meta'});
         this._loginText.clutter_text.line_wrap = true;
         this._loginBox.add_child(this._loginText);
         this._content.add_child(this._loginBox);
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-        this._addAccountItem = new PopupMenu.PopupMenuItem('🔑 Добавить аккаунт…');
+        this._addAccountItem = new PopupMenu.PopupMenuItem('🔑 Add Account…');
         this._addAccountItem.connect('activate', () => this._startLogin());
         this.menu.addMenuItem(this._addAccountItem);
 
@@ -242,13 +243,13 @@ class CblIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(this._codeItem);
         this._codeItem.hide();
 
-        this._completeLoginItem = new PopupMenu.PopupMenuItem('✓ Я подтвердил вход');
+        this._completeLoginItem = new PopupMenu.PopupMenuItem('✓ I confirmed login');
         this._completeLoginItem.setSensitive(false);
         this._completeLoginItem.connect('activate', () => this._completeLogin());
         this.menu.addMenuItem(this._completeLoginItem);
         this._completeLoginItem.hide();
 
-        this._cancelLoginItem = new PopupMenu.PopupMenuItem('Отмена');
+        this._cancelLoginItem = new PopupMenu.PopupMenuItem('Cancel');
         this._cancelLoginItem.connect('activate', () => this._cancelLogin());
         this.menu.addMenuItem(this._cancelLoginItem);
         this._cancelLoginItem.hide();
@@ -261,6 +262,13 @@ class CblIndicator extends PanelMenu.Button {
             this.refresh();
             return GLib.SOURCE_CONTINUE;
         });
+        this._countdownId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 1, () => {
+            if (!this._refreshing && this._nextRefreshSeconds > 0) {
+                this._nextRefreshSeconds -= 1;
+                this._setIdleStatus();
+            }
+            return GLib.SOURCE_CONTINUE;
+        });
         this.refresh();
     }
 
@@ -268,6 +276,10 @@ class CblIndicator extends PanelMenu.Button {
         if (this._timerId) {
             GLib.Source.remove(this._timerId);
             this._timerId = 0;
+        }
+        if (this._countdownId) {
+            GLib.Source.remove(this._countdownId);
+            this._countdownId = 0;
         }
         super.destroy();
     }
@@ -295,28 +307,49 @@ class CblIndicator extends PanelMenu.Button {
         }
     }
 
-    refresh() {
+    refresh(showProgress = false) {
         if (this._refreshing)
             return;
         this._refreshing = true;
+        const startedAt = Date.now();
+        const minVisibleMs = showProgress ? 1500 : 0;
         if (this._headerRefresh)
             this._headerRefresh.label = '⟳';
         if (this._statusItem)
             this._statusItem.label.text = 'Status: refreshing…';
         this._getJSON(STATUS_URL, 'GET', (payload, err) => {
-            this._refreshing = false;
-            if (this._headerRefresh)
-                this._headerRefresh.label = '↻';
-            if (err) {
-                this._applyError(err);
-                return;
+            const finish = () => {
+                this._refreshing = false;
+                this._nextRefreshSeconds = REFRESH_SECONDS;
+                if (this._headerRefresh)
+                    this._headerRefresh.label = '↻';
+                if (err) {
+                    this._applyError(err);
+                    return;
+                }
+                if (!payload.ok) {
+                    this._applyError(new Error(payload.error || 'CBL unavailable'));
+                    return;
+                }
+                this._applyStatus(payload);
+            };
+            const waitMs = Math.max(0, minVisibleMs - (Date.now() - startedAt));
+            if (waitMs > 0) {
+                GLib.timeout_add(GLib.PRIORITY_DEFAULT, waitMs, () => {
+                    finish();
+                    return GLib.SOURCE_REMOVE;
+                });
+            } else {
+                finish();
             }
-            if (!payload.ok) {
-                this._applyError(new Error(payload.error || 'CBL unavailable'));
-                return;
-            }
-            this._applyStatus(payload);
         });
+    }
+
+    _setIdleStatus() {
+        if (!this._statusItem || this._refreshing)
+            return;
+        const base = this._hasAccounts ? 'OK' : 'waiting for first account';
+        this._statusItem.label.text = `Status: ${base} · next refresh ${this._nextRefreshSeconds}s`;
     }
 
     _applyStatus(payload) {
@@ -329,7 +362,7 @@ class CblIndicator extends PanelMenu.Button {
             this._subheading.text = 'limits';
             this._badge.hide();
             this._loginBox.show();
-            this._statusItem.label.text = 'Status: waiting for first account';
+            this._setIdleStatus();
             this._showNoAccounts();
             return;
         }
@@ -340,17 +373,17 @@ class CblIndicator extends PanelMenu.Button {
         this._label.text = '•••';
         this._icon.gicon = this._stateIcon(stateClass);
         this._heading.text = 'Codex';
-        this._subheading.text = `${accounts.length} ${accounts.length === 1 ? 'профиль' : 'профиля'}`;
+        this._subheading.text = `${accounts.length} ${accounts.length === 1 ? 'profile' : 'profiles'}`;
         this._badge.hide();
         this._loginBox.hide();
-        this._statusItem.label.text = 'Status: OK';
+        this._setIdleStatus();
         this._applyAccounts(accounts);
     }
 
     _showNoAccounts() {
         this._accountsBox.destroy_all_children();
         const box = new St.BoxLayout({vertical: true, style_class: 'cbl-empty-card'});
-        const title = new St.Label({text: 'Аккаунтов: 0', style_class: 'cbl-empty-title'});
+        const title = new St.Label({text: 'Accounts: 0', style_class: 'cbl-empty-title'});
         box.add_child(title);
         this._accountsBox.add_child(box);
     }
@@ -382,7 +415,7 @@ class CblIndicator extends PanelMenu.Button {
         this._completeLoginItem.show();
         this._cancelLoginItem.show();
         this._loginBox.show();
-        this._codeItem.label.text = 'Запрашиваю код…';
+        this._codeItem.label.text = 'Requesting code…';
         this._getJSON(LOGIN_START_URL, 'POST', (payload, err) => {
             if (err || !payload?.ok) {
                 this._codeItem.label.text = `Login failed: ${err?.message || payload?.error || 'unknown error'}`;
@@ -392,12 +425,12 @@ class CblIndicator extends PanelMenu.Button {
             }
             this._loginID = payload.id;
             this._latestUserCode = payload.user_code || '';
-            this._codeItem.label.text = `Код: ${payload.user_code}`;
+            this._codeItem.label.text = `Code: ${payload.user_code}`;
             this._codeItem.setSensitive(true);
             const copied = copyText(this._latestUserCode);
             this._loginText.text = copied
-                ? `Открыл страницу OpenAI. Код ${payload.user_code} уже скопирован в буфер. Вставь его в браузере, потом нажми «Я подтвердил вход».`
-                : `Открыл страницу OpenAI. Нажми строку «Код», вставь код ${payload.user_code} в браузере, потом нажми «Я подтвердил вход».`;
+                ? `Opened OpenAI. Code ${payload.user_code} is copied. Paste it in the browser, then click “I confirmed login”.`
+                : `Opened OpenAI. Click the Code row to copy ${payload.user_code}, paste it in the browser, then click “I confirmed login”.`;
             this._completeLoginItem.setSensitive(true);
             openURL(payload.verification_url);
         });
@@ -407,7 +440,7 @@ class CblIndicator extends PanelMenu.Button {
         if (!this._latestUserCode)
             return;
         if (copyText(this._latestUserCode))
-            this._codeItem.label.text = `Код скопирован: ${this._latestUserCode}`;
+            this._codeItem.label.text = `Code copied: ${this._latestUserCode}`;
     }
 
     _cancelLogin() {
@@ -419,7 +452,7 @@ class CblIndicator extends PanelMenu.Button {
         this._completeLoginItem.setSensitive(false);
         this._completeLoginItem.hide();
         this._cancelLoginItem.hide();
-        this._loginText.text = 'Чтобы добавить аккаунт: нажми «Добавить аккаунт…», подтверди вход в браузере, потом нажми «Я подтвердил вход».';
+        this._loginText.text = 'To add an account: click “Add Account…”, confirm in the browser, then click “I confirmed login”.';
         if (this._hasAccounts)
             this._loginBox.hide();
         else
