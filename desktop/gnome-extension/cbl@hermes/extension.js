@@ -145,7 +145,7 @@ class AccountCard extends St.BoxLayout {
         const label = new St.Label({text: name, style_class: 'cbl-meter-label'});
         const track = new St.Widget({
             style_class: 'cbl-mini-track',
-            layout_manager: new Clutter.BinLayout(),
+            layout_manager: new Clutter.FixedLayout(),
         });
         const fill = new St.Widget({
             style_class: 'cbl-mini-fill',
@@ -153,6 +153,7 @@ class AccountCard extends St.BoxLayout {
             y_align: Clutter.ActorAlign.CENTER,
         });
         fill.set_width(Math.max(2, Math.round(160 * remaining / 100)));
+        fill.set_position(0, 1);
         styleFill(fill, remaining);
         track.add_child(fill);
         const value = new St.Label({
@@ -174,6 +175,7 @@ class CblIndicator extends PanelMenu.Button {
         this._extension = extension;
         this._loginID = '';
         this._latestUserCode = '';
+        this._refreshing = false;
 
         this._icon = new St.Icon({
             gicon: this._loadIcon('assets/cbl-symbolic.svg'),
@@ -184,7 +186,7 @@ class CblIndicator extends PanelMenu.Button {
         this._box.add_child(this._label);
         this.add_child(this._box);
 
-        this._root = new PopupMenu.PopupBaseMenuItem({reactive: false, can_focus: false});
+        this._root = new PopupMenu.PopupBaseMenuItem({reactive: true, can_focus: false});
         this._root.add_style_class_name('cbl-popup-item');
         this._content = new St.BoxLayout({vertical: true, style_class: 'cbl-popup'});
         this._root.add_child(this._content);
@@ -206,6 +208,10 @@ class CblIndicator extends PanelMenu.Button {
             y_align: Clutter.ActorAlign.CENTER,
         });
         this._headerRefresh.connect('clicked', () => this.refresh());
+        this._headerRefresh.connect('button-press-event', () => {
+            this.refresh();
+            return Clutter.EVENT_STOP;
+        });
         this._headerRefresh.connect('button-release-event', () => {
             this.refresh();
             return Clutter.EVENT_STOP;
@@ -290,7 +296,17 @@ class CblIndicator extends PanelMenu.Button {
     }
 
     refresh() {
+        if (this._refreshing)
+            return;
+        this._refreshing = true;
+        if (this._headerRefresh)
+            this._headerRefresh.label = '⟳';
+        if (this._statusItem)
+            this._statusItem.label.text = 'Status: refreshing…';
         this._getJSON(STATUS_URL, 'GET', (payload, err) => {
+            this._refreshing = false;
+            if (this._headerRefresh)
+                this._headerRefresh.label = '↻';
             if (err) {
                 this._applyError(err);
                 return;
