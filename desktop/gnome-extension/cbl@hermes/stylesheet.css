@@ -112,12 +112,15 @@
   height: 8px;
   background-color: #3a3a3f;
   border-radius: 999px;
+  padding: 0;
 }
 
 .cbl-mini-fill {
   height: 6px;
   background-color: #2ed36f;
   border-radius: 999px;
+  margin-top: 1px;
+  margin-bottom: 1px;
 }
 
 .cbl-mini-fill:warning {

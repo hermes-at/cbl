@@ -143,10 +143,16 @@ class AccountCard extends St.BoxLayout {
         const remaining = clamp(data?.remaining, 0, 100);
         const row = new St.BoxLayout({vertical: false, style_class: 'cbl-meter-row'});
         const label = new St.Label({text: name, style_class: 'cbl-meter-label'});
-        const track = new St.Widget({style_class: 'cbl-mini-track'});
-        const fill = new St.Widget({style_class: 'cbl-mini-fill', y_align: Clutter.ActorAlign.CENTER});
+        const track = new St.Widget({
+            style_class: 'cbl-mini-track',
+            layout_manager: new Clutter.BinLayout(),
+        });
+        const fill = new St.Widget({
+            style_class: 'cbl-mini-fill',
+            x_align: Clutter.ActorAlign.START,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
         fill.set_width(Math.max(2, Math.round(160 * remaining / 100)));
-        fill.set_position(0, 1);
         styleFill(fill, remaining);
         track.add_child(fill);
         const value = new St.Label({
@@ -190,8 +196,20 @@ class CblIndicator extends PanelMenu.Button {
         this._subheading = new St.Label({text: 'загрузка…', style_class: 'cbl-subheading'});
         titleBox.add_child(this._heading);
         titleBox.add_child(this._subheading);
-        this._headerRefresh = new St.Button({label: '↻', style_class: 'cbl-header-refresh'});
+        this._headerRefresh = new St.Button({
+            label: '↻',
+            style_class: 'cbl-header-refresh',
+            reactive: true,
+            can_focus: true,
+            track_hover: true,
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
         this._headerRefresh.connect('clicked', () => this.refresh());
+        this._headerRefresh.connect('button-release-event', () => {
+            this.refresh();
+            return Clutter.EVENT_STOP;
+        });
         this._badge = new St.Label({text: 'CBL', style_class: 'cbl-badge'});
         header.add_child(titleBox);
         header.add_child(this._headerRefresh);
