@@ -150,8 +150,11 @@ func dashboardPayloadAll(snaps []UsageSnapshot, err error) map[string]any {
 		return payload
 	}
 	if len(snaps) == 0 {
-		payload["ok"] = false
-		payload["error"] = "no usage data available"
+		payload["ok"] = true
+		payload["text"] = "Codex: 0 accounts"
+		payload["tooltip"] = "No CBL accounts saved yet. Use Add Account to add the first account."
+		payload["class"] = "empty"
+		payload["accounts"] = []map[string]any{}
 		return payload
 	}
 	snap := snaps[0]

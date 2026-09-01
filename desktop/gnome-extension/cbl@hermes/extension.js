@@ -259,7 +259,17 @@ class CblIndicator extends PanelMenu.Button {
     }
 
     _applyStatus(payload) {
-        const accounts = payload.accounts?.length ? payload.accounts : [payload];
+        const accounts = payload.accounts || [];
+        if (!accounts.length) {
+            this._label.text = 'cbl';
+            this._icon.gicon = this._stateIcon('good');
+            this._heading.text = 'Codex';
+            this._subheading.text = '0 аккаунтов';
+            this._badge.text = 'ADD';
+            this._statusItem.label.text = 'Status: waiting for first account';
+            this._showNoAccounts();
+            return;
+        }
         let worst = 100;
         for (const account of accounts)
             worst = Math.min(worst, accountWorstRemaining(account));
@@ -271,6 +281,17 @@ class CblIndicator extends PanelMenu.Button {
         this._badge.text = stateClass.toUpperCase();
         this._statusItem.label.text = 'Status: OK';
         this._applyAccounts(accounts);
+    }
+
+    _showNoAccounts() {
+        this._accountsBox.destroy_all_children();
+        const box = new St.BoxLayout({vertical: true, style_class: 'cbl-empty-card'});
+        const title = new St.Label({text: 'Аккаунтов: 0', style_class: 'cbl-empty-title'});
+        const text = new St.Label({text: 'Нажми Add Account… ниже, подтверди вход в браузере, потом нажми I confirmed login.', style_class: 'cbl-empty-text'});
+        text.clutter_text.line_wrap = true;
+        box.add_child(title);
+        box.add_child(text);
+        this._accountsBox.add_child(box);
     }
 
     _applyAccounts(accounts) {

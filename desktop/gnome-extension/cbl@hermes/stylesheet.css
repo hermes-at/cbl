@@ -3,7 +3,7 @@
 }
 
 .cbl-popup {
-  min-width: 360px;
+  min-width: 300px;
   padding: 14px;
   spacing: 12px;
 }
@@ -30,7 +30,8 @@
 }
 
 .cbl-account-row,
-.cbl-account-card {
+.cbl-account-card,
+.cbl-empty-card {
   background: #202020;
   border-radius: 12px;
   color: #d8d8df;
@@ -41,6 +42,22 @@
 .cbl-account-card {
   border: 1px solid #323236;
   spacing: 8px;
+}
+
+.cbl-empty-card {
+  border: 1px solid #323236;
+  spacing: 6px;
+}
+
+.cbl-empty-title {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.cbl-empty-text {
+  color: #a8a8b3;
+  font-size: 12px;
 }
 
 .cbl-account-header,

@@ -116,11 +116,7 @@ func LoadAll(ctx context.Context, opts Options) ([]UsageSnapshot, error) {
 	}
 	files := accountAuthFiles()
 	if len(files) == 0 {
-		snap, err := Load(ctx, opts)
-		if err != nil {
-			return nil, err
-		}
-		return []UsageSnapshot{snap}, nil
+		return []UsageSnapshot{}, nil
 	}
 	baseURL := loadBaseURL(opts)
 	proxy := loadProxy(opts)

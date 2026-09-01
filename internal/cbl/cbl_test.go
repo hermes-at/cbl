@@ -183,6 +183,19 @@ func TestLoadAllFetchesSavedAccounts(t *testing.T) {
 	}
 }
 
+func TestLoadAllReturnsEmptyWhenNoAccounts(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("CODEX_HOME", "")
+	snaps, err := LoadAll(context.Background(), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snaps) != 0 {
+		t.Fatalf("snaps = %#v", snaps)
+	}
+}
+
 func TestRenderWaybarJSON(t *testing.T) {
 	snap := UsageSnapshot{
 		FetchedAt:       time.Unix(0, 0).UTC(),

@@ -49,6 +49,20 @@ func TestDashboardPayloadIncludesMultipleAccounts(t *testing.T) {
 	}
 }
 
+func TestDashboardPayloadWithNoAccountsIsEmptyState(t *testing.T) {
+	payload := dashboardPayloadAll(nil, nil)
+	if payload["ok"] != true {
+		t.Fatalf("ok = %#v", payload["ok"])
+	}
+	accounts := payload["accounts"].([]map[string]any)
+	if len(accounts) != 0 {
+		t.Fatalf("accounts = %#v", accounts)
+	}
+	if payload["class"] != "empty" {
+		t.Fatalf("class = %#v", payload["class"])
+	}
+}
+
 func TestDashboardRouteServesLoginUI(t *testing.T) {
 	mux := http.NewServeMux()
 	state := &cache{}
