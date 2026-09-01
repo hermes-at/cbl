@@ -156,7 +156,7 @@ func onReady() {
 
 	go func() {
 		refreshStatus()
-		ticker := time.NewTicker(5 * time.Minute)
+		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
 		for {
 			select {

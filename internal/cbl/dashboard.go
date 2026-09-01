@@ -118,12 +118,14 @@ func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
 			return
 		}
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-			defer cancel()
-			snaps, err := LoadAll(ctx, opts)
-			state.setAll(snaps, err)
-		}()
+		refreshCtx, refreshCancel := context.WithTimeout(context.Background(), 45*time.Second)
+		defer refreshCancel()
+		snaps, refreshErr := LoadAll(refreshCtx, opts)
+		state.setAll(snaps, refreshErr)
+		if refreshErr != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": refreshErr.Error()})
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "auth_file": path})
 	})
 }

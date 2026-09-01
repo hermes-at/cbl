@@ -12,7 +12,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 const STATUS_URL = 'http://127.0.0.1:18088/api/status';
 const LOGIN_START_URL = 'http://127.0.0.1:18088/api/login/start';
 const LOGIN_COMPLETE_URL = 'http://127.0.0.1:18088/api/login/complete';
-const REFRESH_SECONDS = 300;
+const REFRESH_SECONDS = 60;
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, Number(value) || 0));
@@ -190,8 +190,11 @@ class CblIndicator extends PanelMenu.Button {
         this._subheading = new St.Label({text: 'загрузка…', style_class: 'cbl-subheading'});
         titleBox.add_child(this._heading);
         titleBox.add_child(this._subheading);
+        this._headerRefresh = new St.Button({label: '↻', style_class: 'cbl-header-refresh'});
+        this._headerRefresh.connect('clicked', () => this.refresh());
         this._badge = new St.Label({text: 'CBL', style_class: 'cbl-badge'});
         header.add_child(titleBox);
+        header.add_child(this._headerRefresh);
         header.add_child(this._badge);
         this._content.add_child(header);
 
@@ -213,15 +216,18 @@ class CblIndicator extends PanelMenu.Button {
         this._codeItem.setSensitive(false);
         this._codeItem.connect('activate', () => this._copyLoginCode());
         this.menu.addMenuItem(this._codeItem);
+        this._codeItem.hide();
 
         this._completeLoginItem = new PopupMenu.PopupMenuItem('✓ Я подтвердил вход');
         this._completeLoginItem.setSensitive(false);
         this._completeLoginItem.connect('activate', () => this._completeLogin());
         this.menu.addMenuItem(this._completeLoginItem);
+        this._completeLoginItem.hide();
 
-        this._refreshItem = new PopupMenu.PopupMenuItem('↻ Refresh');
-        this._refreshItem.connect('activate', () => this.refresh());
-        this.menu.addMenuItem(this._refreshItem);
+        this._cancelLoginItem = new PopupMenu.PopupMenuItem('Отмена');
+        this._cancelLoginItem.connect('activate', () => this._cancelLogin());
+        this.menu.addMenuItem(this._cancelLoginItem);
+        this._cancelLoginItem.hide();
 
         this._statusItem = new PopupMenu.PopupMenuItem('Status: local service');
         this._statusItem.setSensitive(false);
@@ -281,6 +287,7 @@ class CblIndicator extends PanelMenu.Button {
 
     _applyStatus(payload) {
         const accounts = payload.accounts || [];
+        this._hasAccounts = accounts.length > 0;
         if (!accounts.length) {
             this._label.text = '•••';
             this._icon.gicon = this._stateIcon('good');
@@ -337,12 +344,16 @@ class CblIndicator extends PanelMenu.Button {
     _startLogin() {
         this._latestUserCode = '';
         this._codeItem.setSensitive(false);
+        this._codeItem.show();
+        this._completeLoginItem.show();
+        this._cancelLoginItem.show();
         this._loginBox.show();
         this._codeItem.label.text = 'Запрашиваю код…';
         this._getJSON(LOGIN_START_URL, 'POST', (payload, err) => {
             if (err || !payload?.ok) {
                 this._codeItem.label.text = `Login failed: ${err?.message || payload?.error || 'unknown error'}`;
                 this._completeLoginItem.setSensitive(false);
+                this._cancelLoginItem.show();
                 return;
             }
             this._loginID = payload.id;
@@ -365,6 +376,22 @@ class CblIndicator extends PanelMenu.Button {
             this._codeItem.label.text = `Код скопирован: ${this._latestUserCode}`;
     }
 
+    _cancelLogin() {
+        this._loginID = '';
+        this._latestUserCode = '';
+        this._codeItem.label.text = 'Code: —';
+        this._codeItem.setSensitive(false);
+        this._codeItem.hide();
+        this._completeLoginItem.setSensitive(false);
+        this._completeLoginItem.hide();
+        this._cancelLoginItem.hide();
+        this._loginText.text = 'Чтобы добавить аккаунт: нажми «Добавить аккаунт…», подтверди вход в браузере, потом нажми «Я подтвердил вход».';
+        if (this._hasAccounts)
+            this._loginBox.hide();
+        else
+            this._loginBox.show();
+    }
+
     _completeLogin() {
         if (!this._loginID)
             return;
@@ -376,11 +403,14 @@ class CblIndicator extends PanelMenu.Button {
             }
             this._loginID = '';
             this._latestUserCode = '';
-            this._codeItem.label.text = 'Login saved';
+            this._codeItem.label.text = 'Code: —';
             this._codeItem.setSensitive(false);
+            this._codeItem.hide();
             this._loginText.text = '';
             this._loginBox.hide();
             this._completeLoginItem.setSensitive(false);
+            this._completeLoginItem.hide();
+            this._cancelLoginItem.hide();
             this.refresh();
         });
     }

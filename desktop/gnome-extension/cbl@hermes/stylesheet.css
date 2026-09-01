@@ -21,6 +21,16 @@
   font-weight: 800;
 }
 
+.cbl-header-refresh {
+  color: #f4f4f5;
+  background-color: #202020;
+  border: 1px solid #323236;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .cbl-subheading,
 .cbl-card-meta {
   color: #a8a8b3;

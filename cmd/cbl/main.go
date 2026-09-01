@@ -89,7 +89,7 @@ func runWatch(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("watch", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var opts cbl.Options
-	interval := fs.Duration("interval", 5*time.Minute, "refresh interval")
+	interval := fs.Duration("interval", time.Minute, "refresh interval")
 	fs.StringVar(&opts.AuthFile, "auth", "", "path to Codex auth.json")
 	fs.StringVar(&opts.ConfigFile, "config", "", "path to config.toml")
 	fs.StringVar(&opts.BaseURL, "base-url", "", "override ChatGPT base URL")
@@ -110,7 +110,7 @@ func runServe(ctx context.Context, args []string) error {
 	fs.SetOutput(os.Stderr)
 	var opts cbl.Options
 	addr := fs.String("addr", "127.0.0.1:18088", "listen address")
-	interval := fs.Duration("interval", 5*time.Minute, "refresh interval")
+	interval := fs.Duration("interval", time.Minute, "refresh interval")
 	fs.StringVar(&opts.AuthFile, "auth", "", "path to Codex auth.json")
 	fs.StringVar(&opts.ConfigFile, "config", "", "path to config.toml")
 	fs.StringVar(&opts.BaseURL, "base-url", "", "override ChatGPT base URL")
@@ -131,8 +131,8 @@ func printHelp() error {
 Usage:
   cbl status [--json|--waybar] [--auth PATH] [--config PATH] [--base-url URL] [--proxy URL]
   cbl login  [--auth PATH] [--proxy URL]
-  cbl watch  [--interval 5m] [--waybar] [--proxy URL]
-  cbl serve  [--addr 127.0.0.1:18088] [--interval 5m] [--proxy URL]
+  cbl watch  [--interval 1m] [--waybar] [--proxy URL]
+  cbl serve  [--addr 127.0.0.1:18088] [--interval 1m] [--proxy URL]
 
 Environment:
   CBL_AUTH_FILE   path to auth.json
