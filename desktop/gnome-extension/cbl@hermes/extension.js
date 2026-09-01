@@ -176,6 +176,7 @@ class CblIndicator extends PanelMenu.Button {
         this._loginID = '';
         this._latestUserCode = '';
         this._refreshing = false;
+        this._refreshTimeoutId = 0;
         this._nextRefreshSeconds = REFRESH_SECONDS;
 
         this._icon = new St.Icon({
@@ -207,11 +208,6 @@ class CblIndicator extends PanelMenu.Button {
             track_hover: true,
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
-        });
-        this._headerRefresh.connect('clicked', () => this.refresh(true));
-        this._headerRefresh.connect('button-press-event', () => {
-            this.refresh(true);
-            return Clutter.EVENT_STOP;
         });
         this._headerRefresh.connect('button-release-event', () => {
             this.refresh(true);
@@ -281,6 +277,10 @@ class CblIndicator extends PanelMenu.Button {
             GLib.Source.remove(this._countdownId);
             this._countdownId = 0;
         }
+        if (this._refreshTimeoutId) {
+            GLib.Source.remove(this._refreshTimeoutId);
+            this._refreshTimeoutId = 0;
+        }
         super.destroy();
     }
 
@@ -308,21 +308,37 @@ class CblIndicator extends PanelMenu.Button {
     }
 
     refresh(showProgress = false) {
-        if (this._refreshing)
+        if (this._refreshing) {
+            if (this._statusItem)
+                this._statusItem.label.text = 'Status: refreshing…';
             return;
+        }
         this._refreshing = true;
         const startedAt = Date.now();
         const minVisibleMs = showProgress ? 1500 : 0;
-        if (this._headerRefresh)
+        let finished = false;
+        if (this._headerRefresh) {
             this._headerRefresh.label = '⟳';
+            this._headerRefresh.set_reactive(false);
+        }
         if (this._statusItem)
             this._statusItem.label.text = 'Status: refreshing…';
-        this._getJSON(STATUS_URL, 'GET', (payload, err) => {
-            const finish = () => {
+
+        const finish = (payload, err) => {
+            if (finished)
+                return;
+            finished = true;
+            if (this._refreshTimeoutId) {
+                GLib.Source.remove(this._refreshTimeoutId);
+                this._refreshTimeoutId = 0;
+            }
+            const apply = () => {
                 this._refreshing = false;
                 this._nextRefreshSeconds = REFRESH_SECONDS;
-                if (this._headerRefresh)
+                if (this._headerRefresh) {
                     this._headerRefresh.label = '↻';
+                    this._headerRefresh.set_reactive(true);
+                }
                 if (err) {
                     this._applyError(err);
                     return;
@@ -336,12 +352,21 @@ class CblIndicator extends PanelMenu.Button {
             const waitMs = Math.max(0, minVisibleMs - (Date.now() - startedAt));
             if (waitMs > 0) {
                 GLib.timeout_add(GLib.PRIORITY_DEFAULT, waitMs, () => {
-                    finish();
+                    apply();
                     return GLib.SOURCE_REMOVE;
                 });
             } else {
-                finish();
+                apply();
             }
+        };
+
+        this._refreshTimeoutId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 10, () => {
+            finish(null, new Error('refresh timed out'));
+            return GLib.SOURCE_REMOVE;
+        });
+
+        this._getJSON(STATUS_URL, 'GET', (payload, err) => {
+            finish(payload, err);
         });
     }
 
