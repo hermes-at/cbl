@@ -179,13 +179,13 @@ class CblIndicator extends PanelMenu.Button {
         this._content.add_child(this._accountsBox);
 
         this._loginBox = new St.BoxLayout({vertical: true, style_class: 'cbl-login-box'});
-        this._loginText = new St.Label({text: 'Вход прямо из top bar: Add Account → подтвердить в браузере → I confirmed login.', style_class: 'cbl-card-meta'});
+        this._loginText = new St.Label({text: 'Чтобы добавить аккаунт: нажми «Добавить аккаунт…», подтверди вход в браузере, потом нажми «Я подтвердил вход».', style_class: 'cbl-card-meta'});
         this._loginText.clutter_text.line_wrap = true;
         this._loginBox.add_child(this._loginText);
         this._content.add_child(this._loginBox);
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-        this._addAccountItem = new PopupMenu.PopupMenuItem('🔑 Add Account…');
+        this._addAccountItem = new PopupMenu.PopupMenuItem('🔑 Добавить аккаунт…');
         this._addAccountItem.connect('activate', () => this._startLogin());
         this.menu.addMenuItem(this._addAccountItem);
 
@@ -193,7 +193,7 @@ class CblIndicator extends PanelMenu.Button {
         this._codeItem.setSensitive(false);
         this.menu.addMenuItem(this._codeItem);
 
-        this._completeLoginItem = new PopupMenu.PopupMenuItem('✓ I confirmed login');
+        this._completeLoginItem = new PopupMenu.PopupMenuItem('✓ Я подтвердил вход');
         this._completeLoginItem.setSensitive(false);
         this._completeLoginItem.connect('activate', () => this._completeLogin());
         this.menu.addMenuItem(this._completeLoginItem);
@@ -265,7 +265,7 @@ class CblIndicator extends PanelMenu.Button {
             this._icon.gicon = this._stateIcon('good');
             this._heading.text = 'Codex';
             this._subheading.text = '0 аккаунтов';
-            this._badge.text = 'ADD';
+            this._badge.hide();
             this._statusItem.label.text = 'Status: waiting for first account';
             this._showNoAccounts();
             return;
@@ -279,6 +279,7 @@ class CblIndicator extends PanelMenu.Button {
         this._heading.text = 'Codex';
         this._subheading.text = `${accounts.length} account${accounts.length === 1 ? '' : 's'} · worst 5h/week ${worst}%`;
         this._badge.text = stateClass.toUpperCase();
+        this._badge.show();
         this._statusItem.label.text = 'Status: OK';
         this._applyAccounts(accounts);
     }
@@ -287,7 +288,7 @@ class CblIndicator extends PanelMenu.Button {
         this._accountsBox.destroy_all_children();
         const box = new St.BoxLayout({vertical: true, style_class: 'cbl-empty-card'});
         const title = new St.Label({text: 'Аккаунтов: 0', style_class: 'cbl-empty-title'});
-        const text = new St.Label({text: 'Нажми Add Account… ниже, подтверди вход в браузере, потом нажми I confirmed login.', style_class: 'cbl-empty-text'});
+        const text = new St.Label({text: 'Нажми «Добавить аккаунт…» ниже, подтверди вход в браузере, потом нажми «Я подтвердил вход».', style_class: 'cbl-empty-text'});
         text.clutter_text.line_wrap = true;
         box.add_child(title);
         box.add_child(text);
@@ -309,6 +310,7 @@ class CblIndicator extends PanelMenu.Button {
         this._icon.gicon = this._stateIcon('error');
         this._subheading.text = 'service unavailable';
         this._badge.text = 'ERROR';
+        this._badge.show();
         this._accountsBox.destroy_all_children();
         this._statusItem.label.text = `Status: ${message}`;
     }
@@ -322,8 +324,8 @@ class CblIndicator extends PanelMenu.Button {
                 return;
             }
             this._loginID = payload.id;
-            this._codeItem.label.text = `Code: ${payload.user_code}`;
-            this._loginText.text = `Открыл страницу OpenAI. Введи код: ${payload.user_code}. Потом нажми I confirmed login.`;
+            this._codeItem.label.text = `Код: ${payload.user_code}`;
+            this._loginText.text = `Открыл страницу OpenAI. Введи код: ${payload.user_code}. Потом нажми «Я подтвердил вход».`;
             this._completeLoginItem.setSensitive(true);
             openURL(payload.verification_url);
         });
