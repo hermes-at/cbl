@@ -16,6 +16,8 @@ type authFile struct {
 		RefreshToken  string `json:"refresh_token"`
 		IDToken       string `json:"id_token"`
 		AccountID     string `json:"account_id"`
+		AccountEmail  string `json:"account_email"`
+		AccountName   string `json:"account_name"`
 		AccessToken2  string `json:"accessToken"`
 		RefreshToken2 string `json:"refreshToken"`
 		IDToken2      string `json:"idToken"`
@@ -25,6 +27,8 @@ type authFile struct {
 	RefreshToken string `json:"refresh_token"`
 	IDToken      string `json:"id_token"`
 	AccountID    string `json:"account_id"`
+	AccountEmail string `json:"account_email"`
+	AccountName  string `json:"account_name"`
 	APIKey       string `json:"OPENAI_API_KEY"`
 	LastRefresh  string `json:"last_refresh"`
 }
@@ -71,6 +75,8 @@ func loadCredentialsWithPath(opts Options) (Credentials, string, error) {
 	refresh := firstNonEmpty(doc.Tokens.RefreshToken, doc.Tokens.RefreshToken2, doc.RefreshToken)
 	idToken := firstNonEmpty(doc.Tokens.IDToken, doc.Tokens.IDToken2, doc.IDToken)
 	accountID := firstNonEmpty(doc.Tokens.AccountID, doc.Tokens.AccountID2, doc.AccountID)
+	accountEmail := firstNonEmpty(doc.Tokens.AccountEmail, doc.AccountEmail, jwtStringClaim(idToken, "email"), jwtStringClaim(access, "email"))
+	accountName := firstNonEmpty(doc.Tokens.AccountName, doc.AccountName, jwtStringClaim(idToken, "name"), jwtStringClaim(idToken, "preferred_username"), jwtStringClaim(access, "name"), jwtStringClaim(access, "preferred_username"))
 	if access == "" || refresh == "" {
 		return Credentials{}, path, errors.New("auth.json exists but tokens.access_token / tokens.refresh_token are missing")
 	}
@@ -79,6 +85,8 @@ func loadCredentialsWithPath(opts Options) (Credentials, string, error) {
 		RefreshToken: refresh,
 		IDToken:      idToken,
 		AccountID:    accountID,
+		AccountEmail: accountEmail,
+		AccountName:  accountName,
 		AuthFile:     path,
 		Source:       "tokens",
 	}, path, nil

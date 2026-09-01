@@ -177,12 +177,25 @@ func dashboardPayloadAll(snaps []UsageSnapshot, err error) map[string]any {
 
 func accountCard(snap UsageSnapshot) map[string]any {
 	return map[string]any{
-		"account_id": snap.AccountID,
-		"plan":       snap.PlanType,
-		"class":      snap.waybarClass(),
-		"windows":    usageCards(snap),
-		"credits":    creditCard(snap),
+		"account_id":    snap.AccountID,
+		"account_email": snap.AccountEmail,
+		"account_name":  snap.AccountName,
+		"account_label": accountLabel(snap),
+		"plan":          snap.PlanType,
+		"class":         snap.waybarClass(),
+		"windows":       usageCards(snap),
+		"credits":       creditCard(snap),
 	}
+}
+
+func accountLabel(snap UsageSnapshot) string {
+	if strings.TrimSpace(snap.AccountEmail) != "" {
+		return strings.TrimSpace(snap.AccountEmail)
+	}
+	if strings.TrimSpace(snap.AccountName) != "" {
+		return strings.TrimSpace(snap.AccountName)
+	}
+	return snap.AccountID
 }
 
 func usageCards(snap UsageSnapshot) []map[string]any {

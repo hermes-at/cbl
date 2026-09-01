@@ -17,6 +17,8 @@ type Credentials struct {
 	RefreshToken string
 	IDToken      string
 	AccountID    string
+	AccountEmail string
+	AccountName  string
 	AuthFile     string
 	Source       string
 	IsAPIKey     bool
@@ -41,6 +43,8 @@ type CreditLimit struct {
 
 type UsageSnapshot struct {
 	AccountID       string
+	AccountEmail    string
+	AccountName     string
 	ProfileName     string
 	PlanType        string
 	PrimaryWindow   *UsageWindow

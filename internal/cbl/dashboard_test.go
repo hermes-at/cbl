@@ -36,7 +36,7 @@ func TestDashboardPayloadIncludesBarsAndCredits(t *testing.T) {
 
 func TestDashboardPayloadIncludesMultipleAccounts(t *testing.T) {
 	snaps := []UsageSnapshot{
-		{AccountID: "acct-1", PlanType: "plus", PrimaryWindow: &UsageWindow{UsedPercent: 10}, SecondaryWindow: &UsageWindow{UsedPercent: 20}},
+		{AccountID: "acct-1", AccountEmail: "max@example.com", PlanType: "plus", PrimaryWindow: &UsageWindow{UsedPercent: 10}, SecondaryWindow: &UsageWindow{UsedPercent: 20}},
 		{AccountID: "acct-2", PlanType: "pro", PrimaryWindow: &UsageWindow{UsedPercent: 30}, SecondaryWindow: &UsageWindow{UsedPercent: 40}},
 	}
 	payload := dashboardPayloadAll(snaps, nil)
@@ -46,6 +46,9 @@ func TestDashboardPayloadIncludesMultipleAccounts(t *testing.T) {
 	}
 	if accounts[0]["account_id"] != "acct-1" || accounts[1]["account_id"] != "acct-2" {
 		t.Fatalf("unexpected accounts: %#v", accounts)
+	}
+	if accounts[0]["account_label"] != "max@example.com" {
+		t.Fatalf("missing account label: %#v", accounts[0])
 	}
 }
 

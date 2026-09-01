@@ -24,6 +24,13 @@ function shortAccount(accountID) {
     return accountID.length > 8 ? `${accountID.slice(0, 8)}…` : accountID;
 }
 
+function accountTitle(account) {
+    const label = account?.account_label || account?.account_email || account?.account_name;
+    if (label)
+        return label.length > 28 ? `${label.slice(0, 27)}…` : label;
+    return shortAccount(account?.account_id);
+}
+
 function openURL(url) {
     try {
         Gio.AppInfo.launch_default_for_uri(url, null);
@@ -100,13 +107,13 @@ class AccountCard extends St.BoxLayout {
 
         const header = new St.BoxLayout({vertical: false, style_class: 'cbl-account-header'});
         const title = new St.Label({
-            text: shortAccount(account?.account_id),
+            text: accountTitle(account),
             style_class: 'cbl-account-title',
             x_expand: true,
         });
         const status = new St.Label({
             text: account?.plan || 'unknown',
-            style_class: `cbl-account-status ${account?.class || 'good'}`,
+            style_class: 'cbl-plan-pill',
         });
         header.add_child(title);
         header.add_child(status);
@@ -125,7 +132,7 @@ class AccountCard extends St.BoxLayout {
         const row = new St.BoxLayout({vertical: false, style_class: 'cbl-meter-row'});
         const label = new St.Label({text: name, style_class: 'cbl-meter-label'});
         const track = new St.Widget({style_class: 'cbl-mini-track'});
-        const fill = new St.Widget({style_class: 'cbl-mini-fill'});
+        const fill = new St.Widget({style_class: 'cbl-mini-fill', y_align: Clutter.ActorAlign.CENTER});
         fill.set_width(Math.max(2, Math.round(160 * remaining / 100)));
         styleFill(fill, remaining);
         track.add_child(fill);
@@ -264,7 +271,7 @@ class CblIndicator extends PanelMenu.Button {
             this._label.text = 'cbl';
             this._icon.gicon = this._stateIcon('good');
             this._heading.text = 'Codex';
-            this._subheading.text = '0 аккаунтов';
+            this._subheading.text = 'лимиты Codex';
             this._badge.hide();
             this._statusItem.label.text = 'Status: waiting for first account';
             this._showNoAccounts();
@@ -277,9 +284,13 @@ class CblIndicator extends PanelMenu.Button {
         this._label.text = `${worst}%`;
         this._icon.gicon = this._stateIcon(stateClass);
         this._heading.text = 'Codex';
-        this._subheading.text = `${accounts.length} account${accounts.length === 1 ? '' : 's'} · worst 5h/week ${worst}%`;
-        this._badge.text = stateClass.toUpperCase();
-        this._badge.show();
+        this._subheading.text = `${accounts.length} ${accounts.length === 1 ? 'профиль' : 'профиля'} · минимум ${worst}%`;
+        if (stateClass === 'good') {
+            this._badge.hide();
+        } else {
+            this._badge.text = stateClass === 'critical' ? 'МАЛО' : 'НИЗКО';
+            this._badge.show();
+        }
         this._statusItem.label.text = 'Status: OK';
         this._applyAccounts(accounts);
     }

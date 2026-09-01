@@ -3,7 +3,9 @@
 }
 
 .cbl-popup {
+  width: 300px;
   min-width: 300px;
+  max-width: 300px;
   padding: 14px;
   spacing: 12px;
 }
@@ -71,7 +73,7 @@
   font-weight: 800;
 }
 
-.cbl-account-status {
+.cbl-plan-pill {
   border-radius: 999px;
   color: #06140c;
   background-color: #2ed36f;
@@ -80,14 +82,6 @@
   padding: 3px 7px;
 }
 
-.cbl-account-status.warning {
-  background-color: #f5c542;
-}
-
-.cbl-account-status.critical,
-.cbl-account-status.error {
-  background-color: #ff5c5c;
-}
 
 .cbl-meter-label {
   color: #a8a8b3;
@@ -111,7 +105,7 @@
 }
 
 .cbl-mini-fill {
-  height: 8px;
+  height: 6px;
   background-color: #2ed36f;
   border-radius: 999px;
 }

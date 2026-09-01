@@ -27,6 +27,19 @@ func TestLoadCredentialsFromTokens(t *testing.T) {
 	}
 }
 
+func TestLoadCredentialsUsesJWTEmailForDisplay(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "auth.json")
+	mustWrite(t, path, []byte(`{"tokens":{"access_token":"a","refresh_token":"r","id_token":"x.eyJlbWFpbCI6ICJtYXhAZXhhbXBsZS5jb20iLCAibmFtZSI6ICJNYXhpbSJ9.y","account_id":"acct-1"}}`))
+	creds, err := loadCredentials(Options{AuthFile: path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if creds.AccountEmail != "max@example.com" || creds.AccountName != "Maxim" {
+		t.Fatalf("unexpected display fields: %#v", creds)
+	}
+}
+
 func TestLoadCredentialsFromConfigAuthFile(t *testing.T) {
 	tmp := t.TempDir()
 	authPath := filepath.Join(tmp, "auth.json")

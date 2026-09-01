@@ -101,6 +101,7 @@ func Load(ctx context.Context, opts Options) (UsageSnapshot, error) {
 			return UsageSnapshot{}, err
 		}
 	}
+	applyCredentialMetadata(&snap, creds)
 	snap.ProfileName = cfg.ProfileName
 	snap.Proxy = proxy
 	return snap, nil
@@ -162,6 +163,7 @@ func LoadAll(ctx context.Context, opts Options) ([]UsageSnapshot, error) {
 			}
 			continue
 		}
+		applyCredentialMetadata(&snap, creds)
 		snap.ProfileName = loadUserConfig(opts).ProfileName
 		snap.Proxy = proxy
 		snaps = append(snaps, snap)
@@ -173,6 +175,14 @@ func LoadAll(ctx context.Context, opts Options) ([]UsageSnapshot, error) {
 		return nil, fmt.Errorf("no usable CBL accounts found")
 	}
 	return snaps, nil
+}
+
+func applyCredentialMetadata(snap *UsageSnapshot, creds Credentials) {
+	if snap.AccountID == "" {
+		snap.AccountID = creds.AccountID
+	}
+	snap.AccountEmail = strings.TrimSpace(creds.AccountEmail)
+	snap.AccountName = strings.TrimSpace(creds.AccountName)
 }
 
 func loadProxy(opts Options) string {

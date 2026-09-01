@@ -286,6 +286,8 @@ func saveCredentials(path string, creds Credentials) error {
 			"access_token":  creds.AccessToken,
 			"refresh_token": creds.RefreshToken,
 			"account_id":    creds.AccountID,
+			"account_email": creds.AccountEmail,
+			"account_name":  creds.AccountName,
 		},
 		"last_refresh": time.Now().UTC().Format(time.RFC3339),
 	}
@@ -302,13 +304,25 @@ func credentialsFromTokens(tokens exchangedTokens) (Credentials, error) {
 	if accountID == "" {
 		accountID = accountIDFromJWT(tokens.AccessToken)
 	}
+	idToken := strings.TrimSpace(tokens.IDToken)
+	accessToken := strings.TrimSpace(tokens.AccessToken)
 	return Credentials{
-		AccessToken:  strings.TrimSpace(tokens.AccessToken),
+		AccessToken:  accessToken,
 		RefreshToken: strings.TrimSpace(tokens.RefreshToken),
-		IDToken:      strings.TrimSpace(tokens.IDToken),
+		IDToken:      idToken,
 		AccountID:    accountID,
+		AccountEmail: firstNonEmpty(jwtStringClaim(idToken, "email"), jwtStringClaim(accessToken, "email")),
+		AccountName:  firstNonEmpty(jwtStringClaim(idToken, "name"), jwtStringClaim(idToken, "preferred_username"), jwtStringClaim(accessToken, "name"), jwtStringClaim(accessToken, "preferred_username")),
 		Source:       "tokens",
 	}, nil
+}
+
+func jwtStringClaim(jwt, key string) string {
+	claims := jwtClaims(jwt)
+	if v, ok := claims[key].(string); ok {
+		return strings.TrimSpace(v)
+	}
+	return ""
 }
 
 func accountIDFromJWT(jwt string) string {
