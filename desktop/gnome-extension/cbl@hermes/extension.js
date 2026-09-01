@@ -13,6 +13,7 @@ const STATUS_URL = 'http://127.0.0.1:18088/api/status';
 const LOGIN_START_URL = 'http://127.0.0.1:18088/api/login/start';
 const LOGIN_COMPLETE_URL = 'http://127.0.0.1:18088/api/login/complete';
 const REFRESH_SECONDS = 60;
+const MANUAL_REFRESH_COOLDOWN_MS = 3000;
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, Number(value) || 0));
@@ -153,7 +154,7 @@ class AccountCard extends St.BoxLayout {
             y_align: Clutter.ActorAlign.CENTER,
         });
         fill.set_width(Math.max(2, Math.round(160 * remaining / 100)));
-        fill.set_position(0, 2);
+        fill.set_position(0, 0);
         styleFill(fill, remaining);
         track.add_child(fill);
         const value = new St.Label({
@@ -177,6 +178,7 @@ class CblIndicator extends PanelMenu.Button {
         this._latestUserCode = '';
         this._refreshing = false;
         this._refreshTimeoutId = 0;
+        this._lastManualRefreshAt = 0;
         this._nextRefreshSeconds = REFRESH_SECONDS;
 
         this._icon = new St.Icon({
@@ -210,7 +212,7 @@ class CblIndicator extends PanelMenu.Button {
             y_align: Clutter.ActorAlign.CENTER,
         });
         this._headerRefresh.connect('button-release-event', () => {
-            this.refresh(true);
+            this._manualRefresh();
             return Clutter.EVENT_STOP;
         });
         this._badge = new St.Label({text: 'CBL', style_class: 'cbl-badge'});
@@ -305,6 +307,18 @@ class CblIndicator extends PanelMenu.Button {
         } catch (err) {
             callback(null, err);
         }
+    }
+
+    _manualRefresh() {
+        const now = Date.now();
+        const waitMs = MANUAL_REFRESH_COOLDOWN_MS - (now - this._lastManualRefreshAt);
+        if (waitMs > 0) {
+            if (this._statusItem)
+                this._statusItem.label.text = `Status: wait ${Math.ceil(waitMs / 1000)}s before refresh`;
+            return;
+        }
+        this._lastManualRefreshAt = now;
+        this.refresh(true);
     }
 
     refresh(showProgress = false) {
