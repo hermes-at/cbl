@@ -43,6 +43,18 @@ function decodeBytes(bytes) {
     return new TextDecoder().decode(bytes.get_data());
 }
 
+function copyText(text) {
+    try {
+        const clipboard = St.Clipboard.get_default();
+        const type = St.ClipboardType ? (St.ClipboardType.CLIPBOARD ?? 1) : 1;
+        clipboard.set_text(type, text);
+        return true;
+    } catch (err) {
+        logError(err);
+        return false;
+    }
+}
+
 const ProgressCard = GObject.registerClass(
 class ProgressCard extends St.BoxLayout {
     _init(title) {
@@ -154,6 +166,7 @@ class CblIndicator extends PanelMenu.Button {
         this._session = Soup.Session.new();
         this._extension = extension;
         this._loginID = '';
+        this._latestUserCode = '';
 
         this._icon = new St.Icon({
             gicon: this._loadIcon('assets/cbl-symbolic.svg'),
@@ -198,7 +211,13 @@ class CblIndicator extends PanelMenu.Button {
 
         this._codeItem = new PopupMenu.PopupMenuItem('Code: —');
         this._codeItem.setSensitive(false);
+        this._codeItem.connect('activate', () => this._copyLoginCode());
         this.menu.addMenuItem(this._codeItem);
+
+        this._copyCodeItem = new PopupMenu.PopupMenuItem('📋 Скопировать код');
+        this._copyCodeItem.setSensitive(false);
+        this._copyCodeItem.connect('activate', () => this._copyLoginCode());
+        this.menu.addMenuItem(this._copyCodeItem);
 
         this._completeLoginItem = new PopupMenu.PopupMenuItem('✓ Я подтвердил вход');
         this._completeLoginItem.setSensitive(false);
@@ -327,7 +346,10 @@ class CblIndicator extends PanelMenu.Button {
     }
 
     _startLogin() {
-        this._codeItem.label.text = 'Requesting login code…';
+        this._latestUserCode = '';
+        this._codeItem.setSensitive(false);
+        this._copyCodeItem.setSensitive(false);
+        this._codeItem.label.text = 'Запрашиваю код…';
         this._getJSON(LOGIN_START_URL, 'POST', (payload, err) => {
             if (err || !payload?.ok) {
                 this._codeItem.label.text = `Login failed: ${err?.message || payload?.error || 'unknown error'}`;
@@ -335,11 +357,26 @@ class CblIndicator extends PanelMenu.Button {
                 return;
             }
             this._loginID = payload.id;
+            this._latestUserCode = payload.user_code || '';
             this._codeItem.label.text = `Код: ${payload.user_code}`;
-            this._loginText.text = `Открыл страницу OpenAI. Введи код: ${payload.user_code}. Потом нажми «Я подтвердил вход».`;
+            this._codeItem.setSensitive(true);
+            this._copyCodeItem.setSensitive(true);
+            const copied = copyText(this._latestUserCode);
+            this._loginText.text = copied
+                ? `Открыл страницу OpenAI. Код ${payload.user_code} уже скопирован в буфер. Вставь его в браузере, потом нажми «Я подтвердил вход».`
+                : `Открыл страницу OpenAI. Нажми «Скопировать код», вставь код ${payload.user_code} в браузере, потом нажми «Я подтвердил вход».`;
             this._completeLoginItem.setSensitive(true);
             openURL(payload.verification_url);
         });
+    }
+
+    _copyLoginCode() {
+        if (!this._latestUserCode)
+            return;
+        if (copyText(this._latestUserCode))
+            this._copyCodeItem.label.text = '📋 Код скопирован';
+        else
+            this._copyCodeItem.label.text = '📋 Не удалось скопировать';
     }
 
     _completeLogin() {
@@ -352,7 +389,11 @@ class CblIndicator extends PanelMenu.Button {
                 return;
             }
             this._loginID = '';
+            this._latestUserCode = '';
             this._codeItem.label.text = 'Login saved';
+            this._codeItem.setSensitive(false);
+            this._copyCodeItem.label.text = '📋 Скопировать код';
+            this._copyCodeItem.setSensitive(false);
             this._loginText.text = 'Аккаунт добавлен. CBL обновляет лимиты.';
             this._completeLoginItem.setSensitive(false);
             this.refresh();
