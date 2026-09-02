@@ -46,6 +46,8 @@ gnome-extensions enable cbl@codex-limits
 gnome-extensions info cbl@codex-limits
 ```
 
+On GNOME Wayland, log out of your Linux user session and log back in after installing or updating CBL. GNOME Shell can keep old extension code in memory until the user session is restarted.
+
 Expected state:
 
 ```text
@@ -63,13 +65,14 @@ curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/uninstall.sh | b
 ## How to add an account
 
 1. Install CBL with the command above.
-2. Open the GNOME top-bar indicator: `•••`.
-3. Click **Add Account…**.
-4. CBL opens the OpenAI device confirmation page in your browser.
-5. The popup shows a one-time **Code**.
-6. Click the **Code** row to copy it, then paste it in the browser.
-7. After confirming in the browser, click **I confirmed login** in the popup.
-8. CBL refreshes immediately and the account card appears.
+2. Log out of your Linux user session and log back in, especially on GNOME Wayland.
+3. Open the GNOME top-bar indicator: `•••`.
+4. Click **Add Account…**.
+5. CBL opens the OpenAI device confirmation page in your browser.
+6. The popup shows a one-time **Code**.
+7. Click the **Code** row to copy it, then paste it in the browser.
+8. After confirming in the browser, click **I confirmed login** in the popup.
+9. CBL refreshes immediately and the account card appears.
 
 You can repeat this flow to add more accounts. Each account gets its own card.
 
