@@ -5,7 +5,7 @@ It supports multiple accounts, shows 5-hour / weekly / credits usage, and lets y
 
 [Русская версия](README.ru.md)
 
-![CBL GNOME popup](docs/assets/cbl-gnome-popup.jpg)
+<img src="docs/assets/cbl-gnome-popup.jpg" alt="CBL GNOME popup" width="520">
 
 ## Why use it?
 

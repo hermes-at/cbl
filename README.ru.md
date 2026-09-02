@@ -5,7 +5,7 @@ CBL — это небольшое Linux-приложение, которое п�
 
 [English README](README.md)
 
-![CBL GNOME popup](docs/assets/cbl-gnome-popup.jpg)
+<img src="docs/assets/cbl-gnome-popup.jpg" alt="CBL GNOME popup" width="520">
 
 ## Зачем это нужно?
 
