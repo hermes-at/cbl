@@ -77,6 +77,16 @@
   spacing: 8px;
 }
 
+.cbl-meter {
+  spacing: 2px;
+}
+
+.cbl-meter-reset {
+  color: #a8a8b3;
+  font-size: 10px;
+  margin-left: 50px;
+}
+
 .cbl-account-title {
   color: #ffffff;
   font-size: 13px;

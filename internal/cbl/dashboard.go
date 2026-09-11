@@ -64,7 +64,7 @@ func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 		defer cancel()
-		client, err := newHTTPClient(loadProxy(opts))
+		client, err := newConfiguredHTTPClient(opts)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 			return
@@ -96,7 +96,7 @@ func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 		ctx, cancel := context.WithTimeout(r.Context(), 16*time.Minute)
 		defer cancel()
 		proxy := loadProxy(opts)
-		client, err := newHTTPClient(proxy)
+		client, err := newConfiguredHTTPClient(opts)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 			return
@@ -114,10 +114,8 @@ func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 		if _, err := os.Stat(defaultCBLAuthFile()); os.IsNotExist(err) {
 			_ = saveCredentials(defaultCBLAuthFile(), creds)
 		}
-		if err := saveUserProxy(resolvedProxy(proxy)); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
-			return
-		}
+		// The extension preferences own proxy_enabled. Do not rewrite that choice
+		// as a side effect of adding an account.
 		refreshCtx, refreshCancel := context.WithTimeout(context.Background(), 45*time.Second)
 		defer refreshCancel()
 		snaps, refreshErr := LoadAll(refreshCtx, opts)

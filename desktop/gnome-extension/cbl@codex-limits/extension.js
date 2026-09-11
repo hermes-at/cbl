@@ -182,6 +182,7 @@ class AccountCard extends St.BoxLayout {
 
     _addMeter(name, data) {
         const remaining = clamp(data?.remaining, 0, 100);
+        const meter = new St.BoxLayout({vertical: true, style_class: 'cbl-meter'});
         const row = new St.BoxLayout({vertical: false, style_class: 'cbl-meter-row'});
         const label = new St.Label({text: name, style_class: 'cbl-meter-label'});
         const track = new MiniMeter(remaining);
@@ -192,7 +193,15 @@ class AccountCard extends St.BoxLayout {
         row.add_child(label);
         row.add_child(track);
         row.add_child(value);
-        this.add_child(row);
+        meter.add_child(row);
+        if (data?.reset) {
+            const reset = new St.Label({
+                text: `reset ${data.reset}`,
+                style_class: 'cbl-meter-reset',
+            });
+            meter.add_child(reset);
+        }
+        this.add_child(meter);
     }
 });
 

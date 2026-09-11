@@ -55,15 +55,33 @@ export default class CblPrefs extends ExtensionPreferences {
         group.add(authRow);
         group.add(baseRow);
 
+        const proxyGroup = new Adw.PreferencesGroup({
+            title: 'Connection',
+            description: 'Choose whether CBL reaches OpenAI directly or through a proxy.',
+        });
+        const proxyEnabled = new Adw.SwitchRow({
+            title: 'Use proxy',
+            subtitle: 'Off means a direct connection and ignores HTTP(S)_PROXY.',
+            active: config.proxy_enabled !== false,
+        });
+        const proxyRow = new Adw.EntryRow({
+            title: 'Proxy URL',
+            text: config.proxy || '',
+        });
+        proxyRow.set_sensitive(proxyEnabled.active);
+        proxyGroup.add(proxyEnabled);
+        proxyGroup.add(proxyRow);
+
         const noteGroup = new Adw.PreferencesGroup({title: 'How it works'});
         const noteRow = new Adw.ActionRow({
             title: 'The panel shows weekly and 5h usage',
-            subtitle: 'Save a Codex auth.json path here, then reload the panel after login if needed.',
+            subtitle: 'The reset time appears below each 5h/week meter when OpenAI provides it.',
         });
         noteRow.activatable = false;
         noteGroup.add(noteRow);
 
         page.add(group);
+        page.add(proxyGroup);
         page.add(noteGroup);
         window.add(page);
 
@@ -79,8 +97,10 @@ export default class CblPrefs extends ExtensionPreferences {
                         profile_name: profileRow.text.trim(),
                         auth_file: authRow.text.trim(),
                         base_url: baseRow.text.trim(),
+                        proxy_enabled: proxyEnabled.active,
+                        proxy: proxyRow.text.trim(),
                     });
-                    noteRow.subtitle = `Saved to ${CONFIG_FILE}`;
+                    noteRow.subtitle = `Saved to ${CONFIG_FILE}. Refresh the panel to apply it now.`;
                 } catch (err) {
                     noteRow.subtitle = `Save failed: ${err.message ?? err}`;
                 }
@@ -88,10 +108,13 @@ export default class CblPrefs extends ExtensionPreferences {
             });
         };
 
+        proxyEnabled.connect('notify::active', () => {
+            proxyRow.set_sensitive(proxyEnabled.active);
+            scheduleSave();
+        });
         profileRow.connect('changed', scheduleSave);
         authRow.connect('changed', scheduleSave);
         baseRow.connect('changed', scheduleSave);
-
-        scheduleSave();
+        proxyRow.connect('changed', scheduleSave);
     }
 }

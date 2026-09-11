@@ -20,11 +20,19 @@ func resolvedProxy(raw string) string {
 }
 
 func newHTTPClient(proxy string) (*http.Client, error) {
+	return newHTTPClientWithEnvironment(proxy, true)
+}
+
+// Direct mode must bypass both the configured proxy and ambient HTTP(S)_PROXY.
+func newHTTPClientWithEnvironment(proxy string, useEnvironmentProxy bool) (*http.Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSHandshakeTimeout = 15 * time.Second
 	transport.ExpectContinueTimeout = 1 * time.Second
 	transport.ResponseHeaderTimeout = 30 * time.Second
-	transport.Proxy = http.ProxyFromEnvironment
+	transport.Proxy = nil
+	if useEnvironmentProxy {
+		transport.Proxy = http.ProxyFromEnvironment
+	}
 
 	proxy = resolvedProxy(proxy)
 	if proxy == "" {

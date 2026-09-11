@@ -81,7 +81,7 @@ func Load(ctx context.Context, opts Options) (UsageSnapshot, error) {
 	}
 	baseURL := loadBaseURL(opts)
 	proxy := loadProxy(opts)
-	client, err := newHTTPClient(proxy)
+	client, err := newConfiguredHTTPClient(opts)
 	if err != nil {
 		return UsageSnapshot{}, err
 	}
@@ -121,7 +121,7 @@ func LoadAll(ctx context.Context, opts Options) ([]UsageSnapshot, error) {
 	}
 	baseURL := loadBaseURL(opts)
 	proxy := loadProxy(opts)
-	client, err := newHTTPClient(proxy)
+	client, err := newConfiguredHTTPClient(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -194,6 +194,23 @@ func loadProxy(opts Options) string {
 	}
 	cfg := loadUserConfig(opts)
 	return strings.TrimSpace(cfg.Proxy)
+}
+
+func newConfiguredHTTPClient(opts Options) (*http.Client, error) {
+	// A command-line --proxy is an explicit one-off override. The saved GUI
+	// choice comes next, so disabling the proxy also overrides CBL_PROXY baked
+	// into the user service by the installer.
+	if strings.TrimSpace(opts.Proxy) != "" {
+		return newHTTPClient(opts.Proxy)
+	}
+	cfg := loadUserConfig(opts)
+	if cfg.ProxyEnabled != nil && !*cfg.ProxyEnabled {
+		return newHTTPClientWithEnvironment("", false)
+	}
+	if proxy := strings.TrimSpace(os.Getenv("CBL_PROXY")); proxy != "" {
+		return newHTTPClient(proxy)
+	}
+	return newHTTPClient(strings.TrimSpace(cfg.Proxy))
 }
 
 func loadFromFixture(path string) (UsageSnapshot, error) {

@@ -102,6 +102,9 @@ func TestSaveUserProxyConfig(t *testing.T) {
 	if got := loadProxy(Options{}); got != "socks5h://127.0.0.1:2080" {
 		t.Fatalf("loadProxy = %q", got)
 	}
+	if cfg.ProxyEnabled == nil || !*cfg.ProxyEnabled {
+		t.Fatalf("proxy_enabled = %#v", cfg.ProxyEnabled)
+	}
 }
 
 func TestDefaultAuthCandidatesPreferCBLAuth(t *testing.T) {

@@ -9,11 +9,12 @@ import (
 )
 
 func TestDashboardPayloadIncludesBarsAndCredits(t *testing.T) {
+	reset := time.Date(2026, time.September, 11, 22, 5, 0, 0, time.UTC)
 	snap := UsageSnapshot{
 		AccountID:       "acct-1",
 		PlanType:        "plus",
 		FetchedAt:       time.Unix(0, 0).UTC(),
-		PrimaryWindow:   &UsageWindow{UsedPercent: 19, RemainingPercent: 81},
+		PrimaryWindow:   &UsageWindow{UsedPercent: 19, RemainingPercent: 81, ResetAt: &reset},
 		SecondaryWindow: &UsageWindow{UsedPercent: 13, RemainingPercent: 87},
 		CreditsBalance:  floatPtr(0),
 	}
@@ -27,6 +28,9 @@ func TestDashboardPayloadIncludesBarsAndCredits(t *testing.T) {
 	}
 	if cards[0]["remaining"] != 81 || cards[1]["remaining"] != 87 {
 		t.Fatalf("unexpected cards: %#v", cards)
+	}
+	if _, ok := cards[0]["reset"].(string); !ok {
+		t.Fatalf("reset is missing from primary card: %#v", cards[0])
 	}
 	credits := payload["credits"].(map[string]any)
 	if credits["text"] != "0.00" {

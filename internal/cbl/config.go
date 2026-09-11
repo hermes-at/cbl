@@ -12,6 +12,9 @@ type UserConfig struct {
 	AuthFile    string `json:"auth_file"`
 	BaseURL     string `json:"base_url"`
 	Proxy       string `json:"proxy"`
+	// An absent setting preserves old configs: a configured proxy stays enabled.
+	// False explicitly means a direct connection.
+	ProxyEnabled *bool `json:"proxy_enabled,omitempty"`
 }
 
 func loadUserConfig(opts Options) UserConfig {
@@ -58,6 +61,8 @@ func saveUserProxy(proxy string) error {
 	path := defaultConfigFile()
 	cfg := loadUserConfig(Options{ConfigFile: path})
 	cfg.Proxy = proxy
+	enabled := proxy != ""
+	cfg.ProxyEnabled = &enabled
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}

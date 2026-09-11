@@ -81,10 +81,19 @@ You can repeat this flow to add more accounts. Each account gets its own card.
 - Open the top-bar `•••` indicator to see all account cards.
 - The `5h` row shows the remaining short usage window.
 - The `week` row shows the remaining weekly usage window.
+- When OpenAI returns a reset timestamp, CBL shows the local reset date and time below the corresponding `5h` or `week` meter.
 - The `credits` row shows available credits when the account reports them.
 - Click the refresh button in the popup header to refresh manually.
 - Manual refresh is throttled so repeated clicks do not spam requests.
 - The status line shows when the next automatic refresh will happen.
+
+## Connection settings
+
+Open the extension settings from GNOME Extensions. The **Connection** section has a **Use proxy** switch and a **Proxy URL** field.
+
+- Turn **Use proxy** on to use the specified `http://`, `https://`, `socks5://`, or `socks5h://` URL.
+- Turn it off for a direct connection. This bypasses the saved proxy plus `CBL_PROXY`, `HTTP_PROXY`, and `HTTPS_PROXY` for the CBL service.
+- Refresh the popup after saving to apply the choice immediately; the next scheduled refresh also uses it.
 
 ## Local commands
 
