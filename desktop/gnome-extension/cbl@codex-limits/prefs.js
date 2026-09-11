@@ -1,7 +1,5 @@
 import Adw from 'gi://Adw';
 import GLib from 'gi://GLib';
-import Gio from 'gi://Gio';
-import Gtk from 'gi://Gtk?version=4.0';
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 const CONFIG_DIR = GLib.build_filenamev([GLib.get_home_dir(), '.config', 'cbl']);
@@ -25,35 +23,13 @@ function saveConfig(config) {
     GLib.file_set_contents(CONFIG_FILE, data);
 }
 
-function defaultAuthPath() {
-    return GLib.build_filenamev([GLib.get_home_dir(), '.codex', 'auth.json']);
-}
-
 export default class CblPrefs extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         window.set_title('cbl');
-        window.set_default_size(560, 360);
+        window.set_default_size(560, 260);
 
         const config = loadConfig();
         const page = new Adw.PreferencesPage();
-        const group = new Adw.PreferencesGroup({title: 'Codex profile'});
-
-        const profileRow = new Adw.EntryRow({
-            title: 'Profile name',
-            text: config.profile_name || 'default',
-        });
-        const authRow = new Adw.EntryRow({
-            title: 'Auth file path',
-            text: config.auth_file || defaultAuthPath(),
-        });
-        const baseRow = new Adw.EntryRow({
-            title: 'Base URL',
-            text: config.base_url || 'https://chatgpt.com/backend-api',
-        });
-
-        group.add(profileRow);
-        group.add(authRow);
-        group.add(baseRow);
 
         const proxyGroup = new Adw.PreferencesGroup({
             title: 'Connection',
@@ -80,7 +56,6 @@ export default class CblPrefs extends ExtensionPreferences {
         noteRow.activatable = false;
         noteGroup.add(noteRow);
 
-        page.add(group);
         page.add(proxyGroup);
         page.add(noteGroup);
         window.add(page);
@@ -94,9 +69,7 @@ export default class CblPrefs extends ExtensionPreferences {
                 saveTimer = 0;
                 try {
                     saveConfig({
-                        profile_name: profileRow.text.trim(),
-                        auth_file: authRow.text.trim(),
-                        base_url: baseRow.text.trim(),
+                        ...config,
                         proxy_enabled: proxyEnabled.active,
                         proxy: proxyRow.text.trim(),
                     });
@@ -112,9 +85,6 @@ export default class CblPrefs extends ExtensionPreferences {
             proxyRow.set_sensitive(proxyEnabled.active);
             scheduleSave();
         });
-        profileRow.connect('changed', scheduleSave);
-        authRow.connect('changed', scheduleSave);
-        baseRow.connect('changed', scheduleSave);
         proxyRow.connect('changed', scheduleSave);
     }
 }
