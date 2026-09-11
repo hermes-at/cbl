@@ -5,7 +5,9 @@ It supports multiple accounts, shows 5-hour / weekly / credits usage, and lets y
 
 [Русская версия](README.ru.md)
 
-<img src="docs/assets/cbl-gnome-popup.jpg" alt="CBL GNOME popup" width="520">
+<img src="docs/assets/cbl-gnome-popup.jpg" alt="CBL GNOME popup with reset times" width="520">
+
+<img src="docs/assets/cbl-gnome-settings.jpg" alt="CBL extension Connection settings" width="520">
 
 ## Why use it?
 
@@ -23,6 +25,12 @@ It gives you:
 - a local HTTP API for panels and custom integrations.
 
 CBL does **not** require Codex CLI. It stores its own login data in `~/.config/cbl`.
+
+## What's new in v0.2.44
+
+- The popup now shows the local **reset date and time** below each `5h` and `week` meter whenever OpenAI returns it.
+- Extension settings now include **Connection**: enable/disable proxying and edit the proxy URL without opening a terminal.
+- With **Use proxy** off, CBL makes a direct connection and bypasses the saved proxy plus service `CBL_PROXY`, `HTTP_PROXY`, and `HTTPS_PROXY` variables.
 
 ## Quick links
 
@@ -89,11 +97,11 @@ You can repeat this flow to add more accounts. Each account gets its own card.
 
 ## Connection settings
 
-Open the extension settings from GNOME Extensions. The **Connection** section has a **Use proxy** switch and a **Proxy URL** field.
+Open the extension settings from GNOME Extensions (click the gear icon next to CBL). The **Connection** section has a **Use proxy** switch and a **Proxy URL** field, as shown above.
 
 - Turn **Use proxy** on to use the specified `http://`, `https://`, `socks5://`, or `socks5h://` URL.
 - Turn it off for a direct connection. This bypasses the saved proxy plus `CBL_PROXY`, `HTTP_PROXY`, and `HTTPS_PROXY` for the CBL service.
-- Refresh the popup after saving to apply the choice immediately; the next scheduled refresh also uses it.
+- Refresh the popup after saving to apply the choice immediately; the next scheduled refresh also uses it. On GNOME Wayland, log out and back in after installing/updating the extension so GNOME Shell loads the new version.
 
 ## Local commands
 
