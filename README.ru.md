@@ -5,9 +5,9 @@ CBL — это небольшое Linux-приложение, которое п�
 
 [English README](README.md)
 
-<img src="docs/assets/cbl-gnome-popup.jpg" alt="CBL GNOME popup с временем сброса" width="520">
-
-<img src="docs/assets/cbl-gnome-settings.jpg" alt="Настройки Connection расширения CBL" width="520">
+<p align="center">
+  <img src="docs/assets/cbl-gnome-popup.jpg" alt="CBL GNOME popup с тремя профилями и временем сброса" width="390">
+</p>
 
 ## Зачем это нужно?
 
@@ -97,7 +97,11 @@ curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/uninstall.sh | b
 
 ## Настройки соединения
 
-Открой настройки расширения через GNOME Extensions (нажми шестерёнку рядом с CBL). В секции **Connection** есть переключатель **Use proxy** и поле **Proxy URL** — их вид можно посмотреть на скриншоте выше.
+Открой настройки расширения через GNOME Extensions (нажми шестерёнку рядом с CBL). В секции **Connection** есть переключатель **Use proxy** и поле **Proxy URL**.
+
+<p align="center">
+  <img src="docs/assets/cbl-gnome-settings.jpg" alt="Настройки Connection CBL с Use proxy и Proxy URL" width="480">
+</p>
 
 - Включи **Use proxy**, чтобы использовать указанный URL вида `http://`, `https://`, `socks5://` или `socks5h://`.
 - Выключи его для прямого соединения. В таком режиме CBL игнорирует сохранённый proxy и переменные окружения `CBL_PROXY`, `HTTP_PROXY` / `HTTPS_PROXY` у своего сервиса.

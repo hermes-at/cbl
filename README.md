@@ -5,9 +5,9 @@ It supports multiple accounts, shows 5-hour / weekly / credits usage, and lets y
 
 [Русская версия](README.ru.md)
 
-<img src="docs/assets/cbl-gnome-popup.jpg" alt="CBL GNOME popup with reset times" width="520">
-
-<img src="docs/assets/cbl-gnome-settings.jpg" alt="CBL extension Connection settings" width="520">
+<p align="center">
+  <img src="docs/assets/cbl-gnome-popup.jpg" alt="CBL GNOME popup with three Codex profiles and reset times" width="390">
+</p>
 
 ## Why use it?
 
@@ -97,7 +97,11 @@ You can repeat this flow to add more accounts. Each account gets its own card.
 
 ## Connection settings
 
-Open the extension settings from GNOME Extensions (click the gear icon next to CBL). The **Connection** section has a **Use proxy** switch and a **Proxy URL** field, as shown above.
+Open the extension settings from GNOME Extensions (click the gear icon next to CBL). The **Connection** section has a **Use proxy** switch and a **Proxy URL** field.
+
+<p align="center">
+  <img src="docs/assets/cbl-gnome-settings.jpg" alt="CBL Connection settings with Use proxy and Proxy URL" width="480">
+</p>
 
 - Turn **Use proxy** on to use the specified `http://`, `https://`, `socks5://`, or `socks5h://` URL.
 - Turn it off for a direct connection. This bypasses the saved proxy plus `CBL_PROXY`, `HTTP_PROXY`, and `HTTPS_PROXY` for the CBL service.
