@@ -1,8 +1,11 @@
 package cbl
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -85,5 +88,32 @@ func TestDashboardRouteServesLoginUI(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("dashboard missing %q", want)
 		}
+	}
+}
+
+func TestDashboardRefreshReloadsUsage(t *testing.T) {
+	tmp := t.TempDir()
+	fixture := filepath.Join(tmp, "usage.json")
+	mustWrite(t, fixture, []byte(`{"account_id":"acct-1","rate_limit":{"primary_window":{"used_percent":25}}}`))
+	mux := http.NewServeMux()
+	state := &cache{}
+	registerUIHandlers(mux, state, Options{Fixture: fixture})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/refresh", nil)
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", res.Code, res.Body.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	accounts := payload["accounts"].([]any)
+	if len(accounts) != 1 {
+		t.Fatalf("accounts = %#v", accounts)
+	}
+	if _, err := LoadAll(context.Background(), Options{Fixture: fixture}); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -10,6 +10,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 const STATUS_URL = 'http://127.0.0.1:18088/api/status';
+const REFRESH_URL = 'http://127.0.0.1:18088/api/refresh';
 const LOGIN_START_URL = 'http://127.0.0.1:18088/api/login/start';
 const LOGIN_COMPLETE_URL = 'http://127.0.0.1:18088/api/login/complete';
 const REFRESH_SECONDS = 60;
@@ -431,7 +432,7 @@ class CblIndicator extends PanelMenu.Button {
             return GLib.SOURCE_REMOVE;
         });
 
-        this._getJSON(STATUS_URL, 'GET', (payload, err) => {
+        this._getJSON(showProgress ? REFRESH_URL : STATUS_URL, showProgress ? 'POST' : 'GET', (payload, err) => {
             finish(payload, err);
         });
     }

@@ -56,6 +56,18 @@ func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 	mux.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, dashboardPayloadAll(state.getAll()))
 	})
+	mux.HandleFunc("/api/refresh", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
+		defer cancel()
+		snaps, err := LoadAll(ctx, opts)
+		state.setAll(snaps, err)
+		writeJSON(w, http.StatusOK, dashboardPayloadAll(state.getAll()))
+	})
 	mux.HandleFunc("/api/login/start", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.Header().Set("Allow", http.MethodPost)
