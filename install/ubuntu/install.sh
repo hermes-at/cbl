@@ -15,16 +15,14 @@ AUTOSTART_DIR="${HOME}/.config/autostart"
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [--systemd] [--indicator] [--extension] [--all] [--proxy URL]
+Usage: install.sh [--systemd] [--indicator] [--extension] [--all]
 
 Default on GNOME: install the user service and GNOME top-bar extension.
 Default elsewhere: install the user service and tray indicator fallback.
 Use --indicator if you explicitly want the AppIndicator tray helper.
-Use --proxy to bake an HTTP/SOCKS5 proxy into the user service.
 EOF
 }
 
-proxy="${CBL_PROXY:-}"
 want_systemd=0
 want_extension=0
 want_indicator=0
@@ -43,17 +41,8 @@ else
       --extension) want_extension=1; component_seen=1 ;;
       --indicator) want_indicator=1; component_seen=1 ;;
       --all) want_systemd=1; want_extension=1; want_indicator=1; component_seen=1 ;;
-      --proxy) prev=1 ;;
-      --proxy=*) proxy="${arg#--proxy=}" ;;
       -h|--help) usage; exit 0 ;;
-      *)
-        if [[ ${prev:-0} -eq 1 ]]; then
-          proxy="$arg"
-          prev=0
-        else
-          echo "Unknown option: $arg" >&2; usage; exit 1
-        fi
-        ;;
+      *) echo "Unknown option: $arg" >&2; usage; exit 1 ;;
     esac
   done
 fi
@@ -67,27 +56,7 @@ if [[ "$component_seen" -eq 0 ]]; then
   fi
 fi
 
-if [[ -z "$proxy" ]]; then
-  prev=0
-  for arg in "$@"; do
-    if [[ $prev -eq 1 ]]; then
-      proxy="$arg"
-      prev=0
-    elif [[ "$arg" == --proxy=* ]]; then
-      proxy="${arg#--proxy=}"
-    elif [[ "$arg" == "--proxy" ]]; then
-      prev=1
-    fi
-  done
-fi
-proxy="${proxy//\"}"
-
-if [[ -n "$proxy" && ! "$proxy" =~ ^(http|https|socks5|socks5h):// ]]; then
-  echo "Proxy must be a full URL, e.g. socks5h://127.0.0.1:2080" >&2
-  exit 1
-fi
-
-if [[ "$want_systemd" -eq 1 || "$want_indicator" -eq 1 || -n "$proxy" ]]; then
+if [[ "$want_systemd" -eq 1 || "$want_indicator" -eq 1 ]]; then
   want_systemd=1
 fi
 
@@ -105,11 +74,7 @@ fi
 if [[ "$want_systemd" -eq 1 ]]; then
   echo "[2/4] Installing systemd --user service"
   install -m 0644 "$ROOT_DIR/install/systemd/cbl.service" "$SYSTEMD_DIR/cbl.service"
-  mkdir -p "$SYSTEMD_DIR/cbl.service.d"
-  {
-    echo "[Service]"
-    echo "Environment=\"CBL_PROXY=$proxy\""
-  } > "$SYSTEMD_DIR/cbl.service.d/proxy.conf"
+  rm -f "$SYSTEMD_DIR/cbl.service.d/proxy.conf"
   if systemctl --user daemon-reload >/dev/null 2>&1; then
     systemctl --user enable --now cbl.service >/dev/null 2>&1 || true
     echo "User service installed: cbl.service"

@@ -3,12 +3,11 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [--systemd] [--indicator] [--extension] [--all] [--proxy URL]
+Usage: install.sh [--systemd] [--indicator] [--extension] [--all]
 
 Default on GNOME: install the user service and GNOME top-bar extension.
 Default elsewhere: install the user service and tray indicator fallback.
 Use --indicator if you explicitly want the AppIndicator tray helper.
-Use --proxy to bake an HTTP/SOCKS5 proxy into the user service.
 EOF
 }
 

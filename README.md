@@ -30,21 +30,17 @@ CBL does **not** require Codex CLI. It stores its own login data in `~/.config/c
 
 - The popup now shows the local **reset date and time** below each `5h` and `week` meter whenever OpenAI returns it.
 - Extension settings now include **Connection**: enable/disable proxying and edit the proxy URL without opening a terminal.
-- With **Use proxy** off, CBL makes a direct connection and bypasses the saved proxy plus service `CBL_PROXY`, `HTTP_PROXY`, and `HTTPS_PROXY` variables.
+- With **Use proxy** off, CBL makes a direct connection and bypasses saved and service-level proxy settings.
 
 ## Quick links
 
 ### Install / update on Ubuntu GNOME
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash -s -- --proxy socks5h://127.0.0.1:2080 --systemd --extension
-```
-
-Without a proxy:
-
-```bash
 curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash -s -- --systemd --extension
 ```
+
+Configure a proxy after installation in **GNOME Extensions → cbl → Connection**.
 
 After install, if needed:
 
@@ -104,7 +100,7 @@ Open the extension settings from GNOME Extensions (click the gear icon next to C
 </p>
 
 - Turn **Use proxy** on to use the specified `http://`, `https://`, `socks5://`, or `socks5h://` URL.
-- Turn it off for a direct connection. This bypasses the saved proxy plus `CBL_PROXY`, `HTTP_PROXY`, and `HTTPS_PROXY` for the CBL service.
+- Turn it off for a direct connection. This bypasses saved and service-level proxy settings for CBL.
 - Refresh the popup after saving to apply the choice immediately; the next scheduled refresh also uses it. On GNOME Wayland, log out and back in after installing/updating the extension so GNOME Shell loads the new version.
 
 ## Local commands
@@ -114,12 +110,6 @@ cbl status
 cbl status --json
 cbl status --waybar
 cbl serve --addr 127.0.0.1:18088
-```
-
-If you need a proxy for local commands:
-
-```bash
-CBL_PROXY=socks5h://127.0.0.1:2080 cbl status
 ```
 
 ## Local HTTP API
@@ -183,7 +173,6 @@ CBL uses per-user files only:
 
 Environment variables:
 
-- `CBL_PROXY` — HTTP/SOCKS proxy for login/status/serve;
 - `CBL_AUTH_FILE` — override legacy single-account auth path;
 - `CBL_CONFIG_FILE` — override config path;
 - `CBL_BASE_URL` — override ChatGPT base URL;

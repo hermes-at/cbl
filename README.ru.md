@@ -30,21 +30,17 @@ CBL **не требует** Codex CLI. Он хранит свои login/account 
 
 - В popup теперь видны локальные **дата и время сброса** под каждым лимитом `5h` и `week`, когда OpenAI их передаёт.
 - В настройках расширения появилась секция **Connection**: proxy можно включить/выключить и изменить его URL без терминала.
-- Если **Use proxy** выключен, CBL подключается напрямую и игнорирует сохранённый proxy, а также переменные сервиса `CBL_PROXY`, `HTTP_PROXY` и `HTTPS_PROXY`.
+- Если **Use proxy** выключен, CBL подключается напрямую и игнорирует сохранённые и сервисные настройки proxy.
 
 ## Быстрые ссылки
 
 ### Установка / обновление на Ubuntu GNOME
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash -s -- --proxy socks5h://127.0.0.1:2080 --systemd --extension
-```
-
-Без proxy:
-
-```bash
 curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash -s -- --systemd --extension
 ```
+
+Настрой proxy после установки в **GNOME Extensions → cbl → Connection**.
 
 После установки, если нужно:
 
@@ -104,7 +100,7 @@ curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/uninstall.sh | b
 </p>
 
 - Включи **Use proxy**, чтобы использовать указанный URL вида `http://`, `https://`, `socks5://` или `socks5h://`.
-- Выключи его для прямого соединения. В таком режиме CBL игнорирует сохранённый proxy и переменные окружения `CBL_PROXY`, `HTTP_PROXY` / `HTTPS_PROXY` у своего сервиса.
+- Выключи его для прямого соединения. В таком режиме CBL игнорирует сохранённые и сервисные настройки proxy.
 - После сохранения обнови popup вручную, чтобы применить выбор сразу; следующее автоматическое обновление также использует его. На GNOME Wayland после установки/обновления расширения выйди из Linux-пользователя и зайди снова, чтобы GNOME Shell загрузил новую версию.
 
 ## Локальные команды
@@ -114,12 +110,6 @@ cbl status
 cbl status --json
 cbl status --waybar
 cbl serve --addr 127.0.0.1:18088
-```
-
-Если нужен proxy для локальных команд:
-
-```bash
-CBL_PROXY=socks5h://127.0.0.1:2080 cbl status
 ```
 
 ## Локальный HTTP API
@@ -183,7 +173,6 @@ CBL использует только user-level файлы:
 
 Переменные окружения:
 
-- `CBL_PROXY` — HTTP/SOCKS proxy для login/status/serve;
 - `CBL_AUTH_FILE` — переопределить legacy single-account auth path;
 - `CBL_CONFIG_FILE` — переопределить config path;
 - `CBL_BASE_URL` — переопределить ChatGPT base URL;
