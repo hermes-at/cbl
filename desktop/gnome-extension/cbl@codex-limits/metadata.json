@@ -1,8 +1,0 @@
-{
-  "uuid": "cbl@codex-limits",
-  "name": "cbl",
-  "description": "Codex usage for the GNOME top bar.",
-  "version": 23,
-  "shell-version": ["45", "46", "47", "48", "49", "50"],
-  "url": "https://github.com/hermes-at/cbl"
-}

@@ -1,6 +1,6 @@
 BINARY=cbl
 
-.PHONY: build build-tray build-all test tidy run install uninstall package-extension package-release
+.PHONY: build build-tray build-all test tidy run install uninstall package-release
 
 build:
 	go build -o bin/$(BINARY) ./cmd/cbl
@@ -11,7 +11,9 @@ build-tray:
 build-all: build build-tray
 
 test:
-	go test ./...
+	go test -race ./...
+	/usr/bin/python3 -m unittest discover -s desktop/app -p 'test_*.py'
+	/usr/bin/python3 -m unittest discover -s install/ubuntu -p 'test_*.py'
 
 tidy:
 	go mod tidy
@@ -24,9 +26,6 @@ install:
 
 uninstall:
 	./install/ubuntu/uninstall.sh
-
-package-extension:
-	./install/ubuntu/package-gnome-extension.sh
 
 package-release:
 	./release/package-release.sh

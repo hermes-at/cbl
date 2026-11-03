@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -261,6 +262,15 @@ func RefreshCredentials(ctx context.Context, client *http.Client, authPath strin
 		tokens.IDToken = creds.IDToken
 	}
 	refreshed, err := credentialsFromTokens(tokens)
+	if refreshed.AccountID == "" {
+		refreshed.AccountID = creds.AccountID
+	}
+	if refreshed.AccountEmail == "" {
+		refreshed.AccountEmail = creds.AccountEmail
+	}
+	if refreshed.AccountName == "" {
+		refreshed.AccountName = creds.AccountName
+	}
 	if err != nil {
 		return Credentials{}, err
 	}
@@ -296,7 +306,7 @@ func saveCredentials(path string, creds Credentials) error {
 		return err
 	}
 	data = append(data, '\n')
-	return os.WriteFile(path, data, 0o600)
+	return atomicWriteFile(path, data, 0o600)
 }
 
 func credentialsFromTokens(tokens exchangedTokens) (Credentials, error) {
@@ -393,4 +403,75 @@ func parseInterval(raw any) time.Duration {
 		}
 	}
 	return 0
+}
+
+func atomicWriteFile(path string, data []byte, mode os.FileMode) (err error) {
+	dir := filepath.Dir(path)
+	if err = os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	f, err := os.CreateTemp(dir, ".cbl-tmp-*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	defer func() {
+		f.Close()
+		if err != nil {
+			_ = os.Remove(tmp)
+		}
+	}()
+	if err = f.Chmod(mode); err != nil {
+		return err
+	}
+	if _, err = f.Write(data); err != nil {
+		return err
+	}
+	if err = f.Sync(); err != nil {
+		return err
+	}
+	if err = f.Close(); err != nil {
+		return err
+	}
+	if err = os.Rename(tmp, path); err != nil {
+		return err
+	}
+	d, e := os.Open(dir)
+	if e == nil {
+		err = d.Sync()
+		_ = d.Close()
+	}
+	return err
+}
+
+func validateProxy(proxy string) error {
+	if strings.TrimSpace(proxy) == "" {
+		return nil
+	}
+	u, err := url.Parse(proxy)
+	if err != nil {
+		return err
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https", "socks5", "socks5h":
+	default:
+		return fmt.Errorf("unsupported proxy scheme")
+	}
+	if u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
+		return fmt.Errorf("proxy URL must not include a path, query or fragment")
+	}
+	if (u.Scheme == "socks5" || u.Scheme == "socks5h") && u.User != nil {
+		return fmt.Errorf("authenticated SOCKS proxies are not supported")
+	}
+	if u.Hostname() == "" {
+		return fmt.Errorf("proxy host is required")
+	}
+	if u.Port() == "" {
+		return fmt.Errorf("proxy port is required")
+	}
+	n, e := strconv.Atoi(u.Port())
+	if e != nil || n < 1 || n > 65535 {
+		return fmt.Errorf("invalid proxy port")
+	}
+	return nil
 }

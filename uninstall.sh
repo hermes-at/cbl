@@ -41,6 +41,9 @@ remove_tree "${TRAY_DIR}"
 rm -f "${AUTOSTART_FILE}"
 rm -f "${HOME}/.local/bin/cbl"
 rm -f "${HOME}/.local/bin/cbl-tray"
+rm -f "${HOME}/.local/bin/cbl-app"
+rm -f "${HOME}/.local/bin/cbl_app.py"
+rm -f "${HOME}/.local/share/applications/cbl.desktop"
 remove_tree "${CONFIG_DIR}"
 systemctl --user daemon-reload 2>/dev/null || true
 

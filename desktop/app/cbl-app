@@ -1,0 +1,238 @@
+#!/usr/bin/python3
+"""Native GTK3 client for the local CBL service."""
+import json
+import threading
+import urllib.error
+import urllib.parse
+import urllib.request
+
+API = 'http://127.0.0.1:18088'
+ACTIONS = {'refresh': ('POST', '/api/refresh'), 'settings_get': ('GET', '/api/settings'), 'settings_post': ('POST', '/api/settings'), 'login_start': ('POST', '/api/login/start'), 'login_complete': ('POST', '/api/login/complete')}
+REFRESH_INTERVAL_MS = 15_000
+
+
+def parse_status(data):
+    if not isinstance(data, dict): return [], 'Invalid status response'
+    if not data.get('ok', True): return [], str(data.get('error') or 'CBL unavailable')
+    accounts = data.get('accounts', [])
+    if not isinstance(accounts, list): return [], 'Invalid accounts list'
+    return [a for a in accounts if isinstance(a, dict)], None
+
+
+def settings_payload(data):
+    return {'proxy_enabled': bool(data.get('proxy_enabled', False)), 'proxy': str(data.get('proxy') or '')}
+
+
+def error_message(exc):
+    """Prefer structured API error fields over urllib's generic HTTP message."""
+    if isinstance(exc, urllib.error.HTTPError):
+        try:
+            data = json.loads(exc.read().decode('utf-8'))
+            if isinstance(data, dict):
+                for key in ('error', 'message', 'detail'):
+                    if data.get(key): return str(data[key])
+        except (ValueError, UnicodeDecodeError):
+            pass
+        finally:
+            exc.close()
+    return str(exc)
+
+
+def request(method, path, payload=None):
+    body = None if payload is None else json.dumps(payload).encode()
+    req = urllib.request.Request(API + path, data=body, method=method, headers={'Content-Type':'application/json'})
+    with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=50) as response: return json.loads(response.read().decode())
+
+
+def create_application():
+    """Build the real GTK application without starting its main loop."""
+    import gi
+    gi.require_version('Gtk', '3.0')
+    gi.require_version('Gio', '2.0')
+    from gi.repository import Gtk, Gio, GLib, Gdk
+
+    class Window(Gtk.ApplicationWindow):
+        def __init__(self, application):
+            super().__init__(application=application, title='CBL — Codex Limits')
+            self.set_default_size(720, 650)
+            self.set_border_width(18)
+            self.alive = True
+            self.login_id = None
+            self.inflight = set()
+            self.settings_loaded = False
+            root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+            self.add(root)
+            heading = Gtk.Box(spacing=8)
+            root.pack_start(heading, False, False, 0)
+            title = Gtk.Label(); title.set_markup('<big><b>Codex usage</b></big>'); title.set_xalign(0)
+            heading.pack_start(title, True, True, 0)
+            self.refresh_button = Gtk.Button(label='Refresh'); self.refresh_button.connect('clicked', lambda *_: self.run_action('refresh', self.render_status)); heading.pack_end(self.refresh_button, False, False, 0)
+            self.add_button = Gtk.Button(label='Add account…'); self.add_button.connect('clicked', self.start_login); heading.pack_end(self.add_button, False, False, 0)
+            self.status = Gtk.Label(label='Connecting to local CBL service…'); self.status.set_xalign(0); self.status.set_line_wrap(True); root.pack_start(self.status, False, False, 0)
+            scroll = Gtk.ScrolledWindow(); scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC); root.pack_start(scroll, True, True, 0)
+            self.cards = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10); scroll.add(self.cards)
+            frame = Gtk.Frame(label='Proxy settings'); root.pack_start(frame, False, False, 0)
+            settings = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8); settings.set_border_width(10); frame.add(settings)
+            self.proxy_enabled = Gtk.CheckButton(label='Use configured proxy'); settings.pack_start(self.proxy_enabled, False, False, 0)
+            row = Gtk.Box(spacing=8); settings.pack_start(row, False, False, 0)
+            self.proxy_entry = Gtk.Entry(); self.proxy_entry.set_placeholder_text('http://127.0.0.1:8080'); row.pack_start(self.proxy_entry, True, True, 0)
+            self.save_button = Gtk.Button(label='Save'); self.save_button.connect('clicked', self.save_settings); row.pack_end(self.save_button, False, False, 0)
+            self.login_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8); root.pack_start(self.login_box, False, False, 0)
+            self.connect('destroy', self.on_destroy)
+            self.set_settings_sensitive(False)
+            self.run_action('status', self.render_status)
+            self.async_call(*ACTIONS['settings_get'], None, self.render_settings)
+            self.refresh_source = GLib.timeout_add(REFRESH_INTERVAL_MS, self.periodic_refresh)
+
+        def on_destroy(self, *_):
+            self.alive = False
+            if self.refresh_source:
+                GLib.source_remove(self.refresh_source)
+                self.refresh_source = None
+
+        def set_settings_sensitive(self, enabled):
+            self.proxy_enabled.set_sensitive(enabled)
+            self.proxy_entry.set_sensitive(enabled)
+            self.save_button.set_sensitive(enabled)
+
+        def async_call(self, method, path, payload, callback, action=None):
+            if action and action in self.inflight: return False
+            if action:
+                self.inflight.add(action)
+                self.update_action_sensitivity()
+            def worker():
+                try: result, error = request(method, path, payload), None
+                except Exception as exc: result, error = None, error_message(exc)
+                GLib.idle_add(self.deliver, callback, result, error, action)
+            threading.Thread(target=worker, daemon=True).start()
+            return True
+
+        def deliver(self, callback, result, error, action=None):
+            if not self.alive: return GLib.SOURCE_REMOVE
+            if action:
+                self.inflight.discard(action)
+                self.update_action_sensitivity()
+            callback(result, error)
+            return GLib.SOURCE_REMOVE
+
+        def update_action_sensitivity(self):
+            self.refresh_button.set_sensitive('refresh' not in self.inflight)
+            self.add_button.set_sensitive('login_start' not in self.inflight and 'login_complete' not in self.inflight)
+            self.save_button.set_sensitive(self.settings_loaded and 'settings_post' not in self.inflight)
+
+        def periodic_refresh(self):
+            if not self.alive: return GLib.SOURCE_REMOVE
+            self.run_action('status', self.render_status)
+            return GLib.SOURCE_CONTINUE
+
+        def run_action(self, name, callback):
+            action = 'refresh' if name in ('refresh', 'status') else name
+            if action in self.inflight: return
+            method, path = ACTIONS.get(name, ('GET','/api/status'))
+            self.status.set_text('Connecting…')
+            self.async_call(method, path, None, callback, action=action)
+
+        def clear_cards(self):
+            for item in self.cards.get_children(): self.cards.remove(item)
+
+        def render_status(self, data, error):
+            self.clear_cards()
+            accounts, problem = parse_status(data) if error is None else ([], error)
+            if problem:
+                self.status.set_text('CBL unavailable: ' + problem); return
+            self.status.set_text('No accounts yet' if not accounts else f'{len(accounts)} account(s)')
+            for account in accounts:
+                box = Gtk.Frame(label=str(account.get('account_label') or account.get('account_id') or 'Account'))
+                inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=7); inner.set_border_width(12); box.add(inner)
+                name = Gtk.Label(label=f"Plan: {account.get('plan') or 'unknown'}"); name.set_xalign(0); inner.pack_start(name,False,False,0)
+                for index, window in enumerate(account.get('windows') or []):
+                    label = Gtk.Label(label=f"{window.get('title') or ('5h' if index == 0 else 'Week')}: {window.get('used','—')}% used · {window.get('remaining','—')}% remaining" + (f" · resets {window['reset']}" if window.get('reset') else ''))
+                    label.set_xalign(0); label.set_line_wrap(True); inner.pack_start(label,False,False,0)
+                    if isinstance(window.get('used'), (int, float)):
+                        progress = Gtk.ProgressBar(); progress.set_fraction(max(0.0, min(1.0, float(window['used']) / 100.0))); progress.set_show_text(False); inner.pack_start(progress,False,False,0)
+                credits = (account.get('credits') or {}).get('text', '—')
+                cr = Gtk.Label(label=f'Credits: {credits}'); cr.set_xalign(0); inner.pack_start(cr,False,False,0)
+                if account.get('error'):
+                    err = Gtk.Label(label='Error: ' + str(account['error'])); err.set_xalign(0); err.set_line_wrap(True); err.get_style_context().add_class('error'); inner.pack_start(err,False,False,0)
+                self.cards.pack_start(box,False,False,0)
+            self.cards.show_all()
+
+        def render_settings(self, data, error):
+            if error: self.status.set_text('Settings unavailable: ' + error); return
+            values = settings_payload(data or {})
+            self.proxy_enabled.set_active(values['proxy_enabled']); self.proxy_entry.set_text(values['proxy'])
+            self.settings_loaded = True
+            self.set_settings_sensitive(True)
+            self.update_action_sensitivity()
+
+        def save_settings(self, *_):
+            if not self.settings_loaded or 'settings_post' in self.inflight: return
+            payload={'proxy_enabled':self.proxy_enabled.get_active(),'proxy':self.proxy_entry.get_text().strip()}
+            self.async_call(*ACTIONS['settings_post'], payload, self.settings_saved, action='settings_post')
+
+        def settings_saved(self, data, error):
+            self.status.set_text('Settings saved' if error is None else 'Could not save settings: '+error)
+
+        def start_login(self, *_):
+            if 'login_start' in self.inflight or 'login_complete' in self.inflight: return
+            self.login_id = None
+            self.clear_login('Requesting device login code…')
+            self.async_call(*ACTIONS['login_start'], None, self.login_started, action='login_start')
+
+        def clear_login(self, message=None):
+            for child in self.login_box.get_children(): self.login_box.remove(child)
+            if message:
+                label=Gtk.Label(label=message); label.set_line_wrap(True); label.set_xalign(0); self.login_box.pack_start(label,False,False,0); self.login_box.show_all()
+
+        def login_started(self, data, error):
+            self.clear_login()
+            if error or not data or not data.get('ok'):
+                self.clear_login('Login failed: '+str(error or (data or {}).get('error','unknown error'))); return
+            self.login_id=data.get('id')
+            url=data.get('verification_url',''); code=data.get('user_code','')
+            label=Gtk.Label(label='Enter this device code in your browser:'); label.set_xalign(0); self.login_box.pack_start(label,False,False,0)
+            row=Gtk.Box(spacing=8); self.login_box.pack_start(row,False,False,0)
+            code_entry=Gtk.Entry(); code_entry.set_text(code); code_entry.set_editable(False); row.pack_start(code_entry,True,True,0)
+            copy=Gtk.Button(label='Copy code'); copy.connect('clicked',lambda *_: Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(code,-1)); row.pack_start(copy,False,False,0)
+            link=Gtk.LinkButton(uri=url,label='Open verification page'); self.login_box.pack_start(link,False,False,0)
+            confirm=Gtk.Button(label='I confirmed login'); confirm.set_name('complete-login'); confirm.connect('clicked',lambda *_: self.complete_login()); self.login_box.pack_start(confirm,False,False,0); self.login_box.show_all()
+            if url: Gio.AppInfo.launch_default_for_uri(url,None)
+
+        def complete_login(self):
+            if not self.login_id or 'login_complete' in self.inflight: return
+            path=ACTIONS['login_complete'][1]+'?'+urllib.parse.urlencode({'id':self.login_id})
+            self.clear_login('Waiting for login confirmation…')
+            self.async_call('POST',path,None,self.login_completed,action='login_complete')
+
+        def login_completed(self, data, error):
+            if error or not data or not data.get('ok'):
+                self.clear_login('Login failed: '+str(error or (data or {}).get('error','unknown error')))
+                retry=Gtk.Button(label='Retry confirmation'); retry.connect('clicked',lambda *_: self.complete_login()); self.login_box.pack_start(retry,False,False,0); self.login_box.show_all(); return
+            self.login_id=None; self.clear_login('Account added. Refreshing…'); self.run_action('refresh',self.render_status)
+
+    class App(Gtk.Application):
+        def __init__(self):
+            super().__init__(application_id='io.github.hermes_at.CBL', flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
+            self.login_requested = False
+        def do_command_line(self, command_line):
+            args = command_line.get_arguments()[1:]
+            self.login_requested = '--login' in args
+            self.activate()
+            return 0
+        def do_activate(self):
+            window=self.props.active_window
+            if window is None: window=Window(self)
+            window.show_all(); window.present()
+            if self.login_requested:
+                self.login_requested = False
+                window.start_login()
+    return App()
+
+
+def main(argv=None):
+    import sys
+    return create_application().run(sys.argv if argv is None else argv)
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

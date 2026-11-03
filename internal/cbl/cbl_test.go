@@ -257,12 +257,14 @@ func TestWatchWithFixture(t *testing.T) {
 	var buf bytes.Buffer
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		_ = Watch(ctx, time.Second, Options{Fixture: fixture, Waybar: true}, &buf)
-		cancel()
 	}()
 	time.Sleep(1500 * time.Millisecond)
 	cancel()
+	<-done // Synchronize before reading bytes.Buffer.
 	if buf.Len() == 0 {
 		t.Fatal("expected output")
 	}

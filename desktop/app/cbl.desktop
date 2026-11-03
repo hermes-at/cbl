@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=CBL
+Comment=Codex usage limits and account manager
+Exec=cbl-app %U
+Icon=utilities-system-monitor
+Terminal=false
+Categories=Utility;
+StartupNotify=true

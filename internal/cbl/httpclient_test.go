@@ -145,3 +145,15 @@ func mustPortInt(port string) int {
 	}
 	return n
 }
+
+func TestDirectClientIgnoresCBLProxy(t *testing.T) {
+	t.Setenv("CBL_PROXY", "http://127.0.0.1:1")
+	c, err := newHTTPClientWithEnvironment("", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := c.Transport.(*http.Transport)
+	if tr.Proxy != nil {
+		t.Fatal("direct client unexpectedly configured a proxy")
+	}
+}

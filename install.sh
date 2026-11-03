@@ -3,11 +3,10 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [--systemd] [--indicator] [--extension] [--all]
+Usage: install.sh [--all|--systemd|--indicator]
 
-Default on GNOME: install the user service and GNOME top-bar extension.
-Default elsewhere: install the user service and tray indicator fallback.
-Use --indicator if you explicitly want the AppIndicator tray helper.
+Installs a standalone CBL window, background user service and panel indicator.
+Legacy --extension is accepted for migration; no GNOME Shell extension is installed.
 EOF
 }
 

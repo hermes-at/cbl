@@ -8,12 +8,22 @@ BIN_DIR="$OUT_DIR/cbl-$VERSION"
 ZIP_PATH="$OUT_DIR/cbl-$VERSION-linux-amd64.zip"
 TAR_PATH="$OUT_DIR/cbl-$VERSION-linux-amd64.tar.gz"
 
+if [[ -e "$BIN_DIR" ]]; then
+  echo "Refusing to reuse existing package directory: $BIN_DIR (choose a fresh version/output directory)" >&2
+  exit 1
+fi
 mkdir -p "$BIN_DIR" "$OUT_DIR"
 ( cd "$ROOT_DIR" && go build -o "$BIN_DIR/cbl" ./cmd/cbl && go build -o "$BIN_DIR/cbl-tray" ./cmd/cbl-tray )
 cp "$ROOT_DIR/install.sh" "$BIN_DIR/install.sh"
 cp "$ROOT_DIR/uninstall.sh" "$BIN_DIR/uninstall.sh"
-cp -R "$ROOT_DIR/install" "$BIN_DIR/install"
-cp -R "$ROOT_DIR/desktop" "$BIN_DIR/desktop"
+python3 - "$ROOT_DIR" "$BIN_DIR" <<'PY'
+from pathlib import Path
+import shutil, sys
+source, target = map(Path, sys.argv[1:])
+for name in ('install', 'desktop'):
+    shutil.copytree(source / name, target / name, dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns('__pycache__', '*.pyc', 'test_*.py'))
+PY
 cp "$ROOT_DIR/README.md" "$BIN_DIR/README.md"
 cp "$ROOT_DIR/README.ru.md" "$BIN_DIR/README.ru.md"
 cp -R "$ROOT_DIR/docs" "$BIN_DIR/docs"

@@ -9,7 +9,9 @@ import (
 	"image/png"
 	"io"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -92,22 +94,16 @@ func onReady() {
 	extraMeta.Disable()
 	systray.AddSeparator()
 
-	addAccount := systray.AddMenuItem("🔑 Add Account…", "Start CBL login from the bar")
-	loginCode := systray.AddMenuItem("Code: —", "Device login code")
-	loginCode.Disable()
-	completeLogin := systray.AddMenuItem("✓ I confirmed login", "Finish CBL login after browser approval")
-	completeLogin.Disable()
-	refresh := systray.AddMenuItem("↻ Refresh", "Refresh now")
+	openApp := systray.AddMenuItem("Open CBL…", "Open the CBL window")
+	addAccount := systray.AddMenuItem("Add account…", "Add an account in the CBL window")
 	statusLine := systray.AddMenuItem("Status: local service", "CBL service status")
 	statusLine.Disable()
 	systray.AddSeparator()
-	settings := systray.AddMenuItem("Settings…", "Settings are coming soon")
-	settings.Disable()
+	settings := systray.AddMenuItem("Settings…", "Open CBL connection settings")
 	about := systray.AddMenuItem("About CBL", "About CBL")
 	about.Disable()
 	quit := systray.AddMenuItem("Quit", "Exit cbl tray")
 
-	var loginID string
 	items := []*systray.MenuItem{updated, account, sessionBar, sessionMeta, weeklyBar, weeklyMeta, extraBar, extraMeta, statusLine}
 	setUnavailable := func(err error) {
 		label := fmt.Sprintf("cbl unavailable: %v", err)
@@ -124,7 +120,7 @@ func onReady() {
 			return
 		}
 		if !payload.OK {
-			setUnavailable(fmt.Errorf(payload.Error))
+			setUnavailable(fmt.Errorf("%s", payload.Error))
 			return
 		}
 		systray.SetTooltip(payload.Tooltip)
@@ -160,33 +156,12 @@ func onReady() {
 		defer ticker.Stop()
 		for {
 			select {
-			case <-refresh.ClickedCh:
-				refreshStatus()
+			case <-openApp.ClickedCh:
+				openDesktopApp(false)
 			case <-addAccount.ClickedCh:
-				loginCode.SetTitle("Requesting login code…")
-				start, err := startLogin()
-				if err != nil {
-					loginCode.SetTitle("Login failed: " + err.Error())
-					completeLogin.Disable()
-					continue
-				}
-				loginID = start.ID
-				loginCode.SetTitle("Code: " + start.UserCode)
-				completeLogin.Enable()
-				openURL(start.VerificationURL)
-			case <-completeLogin.ClickedCh:
-				if loginID == "" {
-					continue
-				}
-				loginCode.SetTitle("Waiting for confirmation…")
-				if err := finishLogin(loginID); err != nil {
-					loginCode.SetTitle("Login failed: " + err.Error())
-					continue
-				}
-				loginID = ""
-				loginCode.SetTitle("Login saved")
-				completeLogin.Disable()
-				refreshStatus()
+				openDesktopApp(true)
+			case <-settings.ClickedCh:
+				openDesktopApp(false)
 			case <-ticker.C:
 				refreshStatus()
 			case <-quit.ClickedCh:
@@ -200,7 +175,8 @@ func onReady() {
 func onExit() {}
 
 func fetchStatus() (statusPayload, error) {
-	resp, err := http.Get(statusURL)
+	client := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{Proxy: nil}}
+	resp, err := client.Get(statusURL)
 	if err != nil {
 		return statusPayload{}, err
 	}
@@ -234,7 +210,7 @@ func startLogin() (loginStartPayload, error) {
 		if payload.Error == "" {
 			payload.Error = strings.TrimSpace(string(data))
 		}
-		return loginStartPayload{}, fmt.Errorf(payload.Error)
+		return loginStartPayload{}, fmt.Errorf("%s", payload.Error)
 	}
 	return payload, nil
 }
@@ -258,7 +234,7 @@ func finishLogin(id string) error {
 		if payload.Error == "" {
 			payload.Error = strings.TrimSpace(string(data))
 		}
-		return fmt.Errorf(payload.Error)
+		return fmt.Errorf("%s", payload.Error)
 	}
 	return nil
 }
@@ -331,6 +307,28 @@ func emptyDash(s string) string {
 		return "—"
 	}
 	return s
+}
+
+func appArguments(login bool) []string {
+	if login {
+		return []string{"--login"}
+	}
+	return nil
+}
+
+func openDesktopApp(login bool) {
+	path, err := exec.LookPath("cbl-app")
+	if err != nil {
+		home, homeErr := os.UserHomeDir()
+		if homeErr != nil {
+			return
+		}
+		path = filepath.Join(home, ".local", "bin", "cbl-app")
+	}
+	cmd := exec.Command(path, appArguments(login)...)
+	if cmd.Start() == nil {
+		go func() { _ = cmd.Wait() }()
+	}
 }
 
 func openURL(url string) {

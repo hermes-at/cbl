@@ -2,6 +2,7 @@ package cbl
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,5 +72,62 @@ func saveUserProxy(proxy string) error {
 		return err
 	}
 	data = append(data, '\n')
-	return os.WriteFile(path, data, 0o600)
+	return atomicWriteFile(path, data, 0o600)
+}
+
+func saveUserConfig(opts Options, proxyEnabled bool, proxy string) error {
+	proxy = strings.TrimSpace(proxy)
+	if proxyEnabled {
+		if proxy == "" {
+			return fmt.Errorf("proxy URL is required when enabled")
+		}
+		if err := validateProxy(proxy); err != nil {
+			return err
+		}
+	} else if proxy != "" {
+		if err := validateProxy(proxy); err != nil {
+			return err
+		}
+	}
+	path := opts.ConfigFile
+	if path == "" {
+		if e := strings.TrimSpace(os.Getenv("CBL_CONFIG_FILE")); e != "" {
+			path = e
+		} else {
+			path = defaultConfigFile()
+		}
+	}
+	raw := map[string]json.RawMessage{}
+	if b, e := os.ReadFile(path); e == nil {
+		if err := json.Unmarshal(b, &raw); err != nil {
+			return fmt.Errorf("read config: %w", err)
+		}
+		if raw == nil {
+			return fmt.Errorf("config must be a JSON object")
+		}
+	} else if !os.IsNotExist(e) {
+		return e
+	}
+	set := func(k string, v any) error {
+		b, e := json.Marshal(v)
+		if e == nil {
+			raw[k] = b
+		}
+		return e
+	}
+	if err := set("proxy_enabled", proxyEnabled); err != nil {
+		return err
+	}
+	if err := set("proxy", proxy); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(raw, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
+	return atomicWriteFile(path, data, 0600)
 }

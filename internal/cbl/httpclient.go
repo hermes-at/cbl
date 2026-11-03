@@ -34,7 +34,11 @@ func newHTTPClientWithEnvironment(proxy string, useEnvironmentProxy bool) (*http
 		transport.Proxy = http.ProxyFromEnvironment
 	}
 
-	proxy = resolvedProxy(proxy)
+	if useEnvironmentProxy {
+		proxy = resolvedProxy(proxy)
+	} else {
+		proxy = strings.TrimSpace(proxy)
+	}
 	if proxy == "" {
 		return &http.Client{Transport: transport, Timeout: 30 * time.Second}, nil
 	}

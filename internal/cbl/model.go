@@ -42,6 +42,7 @@ type CreditLimit struct {
 }
 
 type UsageSnapshot struct {
+	Error           string `json:"error,omitempty"`
 	AccountID       string
 	AccountEmail    string
 	AccountName     string

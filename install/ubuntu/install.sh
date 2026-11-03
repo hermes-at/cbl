@@ -1,141 +1,77 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-BIN_NAME="cbl"
-INSTALL_BIN="${HOME}/.local/bin/${BIN_NAME}"
-TRAY_BIN="${HOME}/.local/bin/cbl-tray"
-SYSTEMD_DIR="${HOME}/.config/systemd/user"
-EXT_UUID="cbl@codex-limits"
-OLD_EXT_UUID="cbl@hermes"
-EXT_DIR="${HOME}/.local/share/gnome-shell/extensions/${EXT_UUID}"
-OLD_EXT_DIR="${HOME}/.local/share/gnome-shell/extensions/${OLD_EXT_UUID}"
-TRAY_DIR="${HOME}/.local/share/cbl"
-AUTOSTART_DIR="${HOME}/.config/autostart"
-
 usage() {
-  cat <<'EOF'
-Usage: install.sh [--systemd] [--indicator] [--extension] [--all]
-
-Default on GNOME: install the user service and GNOME top-bar extension.
-Default elsewhere: install the user service and tray indicator fallback.
-Use --indicator if you explicitly want the AppIndicator tray helper.
-EOF
+  printf '%s\n' 'Usage: install.sh [--all|--systemd|--indicator]' 'Installs the standalone CBL window, background user service and panel indicator.' 'Legacy --extension is accepted as a migration alias; no Shell extension is installed.'
 }
-
-want_systemd=0
-want_extension=0
-want_indicator=0
-component_seen=0
-if [[ $# -eq 0 ]]; then
-  want_systemd=1
-  if command -v gnome-extensions >/dev/null 2>&1; then
-    want_extension=1
-  else
-    want_indicator=1
-  fi
-else
-  for arg in "$@"; do
-    case "$arg" in
-      --systemd) want_systemd=1; component_seen=1 ;;
-      --extension) want_extension=1; component_seen=1 ;;
-      --indicator) want_indicator=1; component_seen=1 ;;
-      --all) want_systemd=1; want_extension=1; want_indicator=1; component_seen=1 ;;
-      -h|--help) usage; exit 0 ;;
-      *) echo "Unknown option: $arg" >&2; usage; exit 1 ;;
-    esac
-  done
+for arg in "$@"; do
+  case "$arg" in
+    --systemd|--indicator|--all) ;;
+    --extension) echo 'Migrating from GNOME extension to standalone CBL.' ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown option: $arg" >&2; usage >&2; exit 1 ;;
+  esac
+done
+# Use the system interpreter: virtualenv Python often cannot import PyGObject.
+if ! /usr/bin/python3 -c "import gi; gi.require_version('Gtk', '3.0'); from gi.repository import Gtk" >/dev/null 2>&1; then
+  echo 'Install desktop dependencies first: sudo apt install python3-gi gir1.2-gtk-3.0' >&2
+  exit 1
 fi
-
-if [[ "$component_seen" -eq 0 ]]; then
-  want_systemd=1
-  if command -v gnome-extensions >/dev/null 2>&1; then
-    want_extension=1
-  else
-    want_indicator=1
-  fi
-fi
-
-if [[ "$want_systemd" -eq 1 || "$want_indicator" -eq 1 ]]; then
-  want_systemd=1
-fi
-
-mkdir -p "${HOME}/.local/bin" "${SYSTEMD_DIR}" "${EXT_DIR}" "${TRAY_DIR}" "${AUTOSTART_DIR}"
-
-echo "[1/4] Installing cbl binaries"
+BIN_DIR="$HOME/.local/bin"
+SYSTEMD_DIR="$HOME/.config/systemd/user"
+APP_DIR="$HOME/.local/share/applications"
+AUTOSTART_DIR="$HOME/.config/autostart"
+mkdir -p "$BIN_DIR" "$SYSTEMD_DIR" "$APP_DIR" "$AUTOSTART_DIR"
+echo '[1/3] Installing CBL binaries and window'
 if [[ -x "$ROOT_DIR/cbl" && -x "$ROOT_DIR/cbl-tray" ]]; then
-  install -m 0755 "$ROOT_DIR/cbl" "$INSTALL_BIN"
-  install -m 0755 "$ROOT_DIR/cbl-tray" "$TRAY_BIN"
+  install -m 0755 "$ROOT_DIR/cbl" "$BIN_DIR/cbl"
+  install -m 0755 "$ROOT_DIR/cbl-tray" "$BIN_DIR/cbl-tray"
 else
-  (cd "$ROOT_DIR" && go build -o "$INSTALL_BIN" ./cmd/cbl && go build -o "$TRAY_BIN" ./cmd/cbl-tray)
-  chmod 0755 "$INSTALL_BIN" "$TRAY_BIN"
+  (cd "$ROOT_DIR" && go build -o "$BIN_DIR/cbl" ./cmd/cbl && go build -o "$BIN_DIR/cbl-tray" ./cmd/cbl-tray)
 fi
-
-if [[ "$want_systemd" -eq 1 ]]; then
-  echo "[2/4] Installing systemd --user service"
-  install -m 0644 "$ROOT_DIR/install/systemd/cbl.service" "$SYSTEMD_DIR/cbl.service"
-  rm -f "$SYSTEMD_DIR/cbl.service.d/proxy.conf"
-  if systemctl --user daemon-reload >/dev/null 2>&1; then
-    systemctl --user enable --now cbl.service >/dev/null 2>&1 || true
-    echo "User service installed: cbl.service"
-  else
-    echo "systemd user bus is not available right now; start cbl.service after login"
-  fi
+install -m 0755 "$ROOT_DIR/desktop/app/cbl-app" "$BIN_DIR/cbl-app"
+# Additional Python modules, if supplied by the app, live beside its launcher.
+if [[ -f "$ROOT_DIR/desktop/app/cbl_app.py" ]]; then
+  install -m 0644 "$ROOT_DIR/desktop/app/cbl_app.py" "$BIN_DIR/cbl_app.py"
 fi
-
-if [[ "$want_extension" -eq 1 ]]; then
-  echo "[3/4] Installing GNOME Shell extension source"
+/usr/bin/python3 - "$ROOT_DIR" "$HOME" <<'PY'
+from pathlib import Path
+import sys
+root, home = map(Path, sys.argv[1:])
+for source, target, executable in [
+    ('desktop/app/cbl.desktop', '.local/share/applications/cbl.desktop', 'cbl-app'),
+    ('desktop/indicator/cbl-indicator.desktop', '.config/autostart/cbl-indicator.desktop', 'cbl-tray'),
+]:
+    # Desktop Entry Exec quoting is not shell quoting.
+    path = str(home / '.local/bin' / executable)
+    path = path.replace('\\', '\\\\').replace('"', '\\"').replace('`', '\\`').replace('$', '\\$').replace('%', '%%')
+    lines = (root / source).read_text().splitlines()
+    (home / target).write_text('\n'.join('Exec="' + path + '"' if line.startswith('Exec=') else line for line in lines) + '\n')
+PY
+echo '[2/3] Installing background user service'
+install -m 0644 "$ROOT_DIR/install/systemd/cbl.service" "$SYSTEMD_DIR/cbl.service"
+rm -f "$SYSTEMD_DIR/cbl.service.d/proxy.conf"
+if systemctl --user daemon-reload; then
+  # Unlike enable --now, restart also picks up a replaced binary on upgrade.
+  systemctl --user enable cbl.service
+  systemctl --user restart cbl.service
+  systemctl --user is-active --quiet cbl.service
+else
+  echo 'No systemd user bus. Files installed; after login run: systemctl --user enable --now cbl.service' >&2
+  exit 1
+fi
+echo '[3/3] Removing obsolete Shell extension (accounts are preserved)'
+for uuid in cbl@codex-limits cbl@hermes; do
   if command -v gnome-extensions >/dev/null 2>&1; then
-    gnome-extensions disable "$EXT_UUID" >/dev/null 2>&1 || true
-    gnome-extensions disable "$OLD_EXT_UUID" >/dev/null 2>&1 || true
-    gnome-extensions uninstall "$OLD_EXT_UUID" >/dev/null 2>&1 || true
+    gnome-extensions disable "$uuid" >/dev/null 2>&1 || true
   fi
-  rm -rf "$EXT_DIR" "$OLD_EXT_DIR"
-  mkdir -p "$EXT_DIR"
-  cp -a "$ROOT_DIR/desktop/gnome-extension/${EXT_UUID}/." "$EXT_DIR/"
-  find "$EXT_DIR" -type d -exec chmod 0755 {} +
-  find "$EXT_DIR" -type f -exec chmod 0644 {} +
-  echo "GNOME extension files are in: $EXT_DIR"
-  if command -v gnome-extensions >/dev/null 2>&1; then
-    package_dir="$(mktemp -d)"
-    if "$ROOT_DIR/install/ubuntu/package-gnome-extension.sh" "$package_dir" >/dev/null 2>&1; then
-      package_zip="$package_dir/cbl-gnome-extension.zip"
-      gnome-extensions install --force "$package_zip" || true
-      gnome-extensions enable "$EXT_UUID" || true
-      if gnome-extensions list --enabled 2>/dev/null | grep -Fxq "$EXT_UUID"; then
-        echo "GNOME extension enabled: $EXT_UUID"
-      else
-        echo "Run: gnome-extensions enable $EXT_UUID"
-      fi
-      rm -rf "$package_dir"
-    else
-      echo "Could not package GNOME extension; run: $ROOT_DIR/install/ubuntu/package-gnome-extension.sh"
-    fi
-  else
-    echo "Run: gnome-extensions enable $EXT_UUID"
-  fi
-  if [[ "$want_indicator" -eq 0 ]]; then
-    rm -f "$AUTOSTART_DIR/cbl-indicator.desktop"
-    if command -v pkill >/dev/null 2>&1; then
-      pkill -xu "$(id -u)" cbl-tray >/dev/null 2>&1 || true
-    fi
-  fi
+  rm -rf "$HOME/.local/share/gnome-shell/extensions/$uuid"
+done
+if [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
+  pkill -xu "$(id -u)" cbl-tray >/dev/null 2>&1 || true
+  (setsid "$BIN_DIR/cbl-tray" >/dev/null 2>&1 &)
+else
+  echo 'Panel indicator will start on next desktop login.'
 fi
-
-if [[ "$want_indicator" -eq 1 ]]; then
-  echo "[4/4] Installing tray indicator"
-  install -m 0644 "$ROOT_DIR/desktop/indicator/cbl-indicator.desktop" "$AUTOSTART_DIR/cbl-indicator.desktop"
-  sed -i "s|^Exec=.*|Exec=${TRAY_BIN}|" "$AUTOSTART_DIR/cbl-indicator.desktop"
-  echo "Tray indicator installed to: $TRAY_BIN"
-  echo "Autostart entry installed to: $AUTOSTART_DIR/cbl-indicator.desktop"
-  if command -v pgrep >/dev/null 2>&1 && pgrep -xu "$(id -u)" cbl-tray >/dev/null 2>&1; then
-    echo "Tray indicator is already running."
-  elif [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
-    (setsid "$TRAY_BIN" >/dev/null 2>&1 &)
-    echo "Tray indicator started for this session."
-  else
-    echo "No desktop session detected; tray indicator will start on next login."
-  fi
-fi
-
-echo "Done."
+echo 'Done. Launch CBL from Applications, or run ~/.local/bin/cbl-app.'
+echo 'On GNOME, enable Ubuntu AppIndicators / AppIndicator support to see the panel icon.'

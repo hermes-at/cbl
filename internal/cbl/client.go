@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -127,13 +128,10 @@ func LoadAll(ctx context.Context, opts Options) ([]UsageSnapshot, error) {
 	}
 	snaps := []UsageSnapshot{}
 	seen := map[string]bool{}
-	var firstErr error
 	for _, path := range files {
 		creds, err := loadCredentials(Options{AuthFile: path, ConfigFile: opts.ConfigFile, BaseURL: opts.BaseURL, Proxy: opts.Proxy})
 		if err != nil {
-			if firstErr == nil {
-				firstErr = err
-			}
+			snaps = append(snaps, UsageSnapshot{AccountID: filepath.Base(path), Error: err.Error()})
 			continue
 		}
 		key := creds.AccountID
@@ -158,21 +156,12 @@ func LoadAll(ctx context.Context, opts Options) ([]UsageSnapshot, error) {
 			}
 		}
 		if err != nil {
-			if firstErr == nil {
-				firstErr = err
-			}
-			continue
+			snap = UsageSnapshot{Error: err.Error()}
 		}
 		applyCredentialMetadata(&snap, creds)
 		snap.ProfileName = loadUserConfig(opts).ProfileName
 		snap.Proxy = proxy
 		snaps = append(snaps, snap)
-	}
-	if len(snaps) == 0 {
-		if firstErr != nil {
-			return nil, firstErr
-		}
-		return nil, fmt.Errorf("no usable CBL accounts found")
 	}
 	return snaps, nil
 }
@@ -375,6 +364,9 @@ func clamp(v, min, max int) int {
 }
 
 func (s UsageSnapshot) summaryLine() string {
+	if s.Error != "" {
+		return "Codex: account unavailable"
+	}
 	parts := make([]string, 0, 5)
 	if s.ProfileName != "" {
 		parts = append(parts, s.ProfileName)
@@ -397,6 +389,9 @@ func (s UsageSnapshot) summaryLine() string {
 }
 
 func (s UsageSnapshot) tooltip() string {
+	if s.Error != "" {
+		return s.Error
+	}
 	lines := []string{s.summaryLine()}
 	if s.ProfileName != "" {
 		lines = append(lines, "profile: "+s.ProfileName)
@@ -425,6 +420,9 @@ func (s UsageSnapshot) tooltip() string {
 }
 
 func (s UsageSnapshot) waybarClass() string {
+	if s.Error != "" {
+		return "error"
+	}
 	if s.PrimaryWindow == nil && s.SecondaryWindow == nil && s.IndividualLimit == nil && s.CreditsBalance == nil {
 		return "error"
 	}

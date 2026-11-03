@@ -17,10 +17,12 @@ import (
 type loginSessions struct {
 	mu       sync.Mutex
 	sessions map[string]DeviceCode
+	busy     map[string]bool
+	created  map[string]time.Time
 }
 
 func newLoginSessions() *loginSessions {
-	return &loginSessions{sessions: map[string]DeviceCode{}}
+	return &loginSessions{sessions: map[string]DeviceCode{}, busy: map[string]bool{}, created: map[string]time.Time{}}
 }
 
 func (s *loginSessions) put(device DeviceCode) string {
@@ -29,7 +31,15 @@ func (s *loginSessions) put(device DeviceCode) string {
 	id := hex.EncodeToString(b[:])
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	for key, created := range s.created {
+		if time.Since(created) > 16*time.Minute && !s.busy[key] {
+			delete(s.sessions, key)
+			delete(s.created, key)
+			delete(s.busy, key)
+		}
+	}
 	s.sessions[id] = device
+	s.created[id] = time.Now()
 	return id
 }
 
@@ -37,14 +47,60 @@ func (s *loginSessions) take(id string) (DeviceCode, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	device, ok := s.sessions[id]
-	if ok {
-		delete(s.sessions, id)
+	if !ok || s.busy[id] || time.Since(s.created[id]) > 16*time.Minute {
+		return DeviceCode{}, false
 	}
-	return device, ok
+	s.busy[id] = true
+	return device, true
+}
+
+func (s *loginSessions) finish(id string, success bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.busy, id)
+	if success {
+		delete(s.sessions, id)
+		delete(s.created, id)
+	}
 }
 
 func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 	logins := newLoginSessions()
+	mux.HandleFunc("/api/settings", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			cfg := loadUserConfig(opts)
+			enabled := cfg.ProxyEnabled != nil && *cfg.ProxyEnabled
+			if cfg.ProxyEnabled == nil {
+				enabled = loadProxy(opts) != ""
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "proxy_enabled": enabled, "proxy": cfg.Proxy})
+		case http.MethodPost:
+			var body struct {
+				ProxyEnabled *bool   `json:"proxy_enabled"`
+				Proxy        *string `json:"proxy"`
+			}
+			decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192))
+			if err := decoder.Decode(&body); err != nil || body.ProxyEnabled == nil || body.Proxy == nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "proxy_enabled and proxy are required"})
+				return
+			}
+			state.opMu.Lock()
+			err := saveUserConfig(opts, *body.ProxyEnabled, *body.Proxy)
+			if err == nil {
+				state.lastRefresh = time.Time{}
+			}
+			state.opMu.Unlock()
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+		default:
+			w.Header().Set("Allow", "GET, POST")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
@@ -64,8 +120,7 @@ func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 		defer cancel()
-		snaps, err := LoadAll(ctx, opts)
-		state.setAll(snaps, err)
+		state.refresh(ctx, opts)
 		writeJSON(w, http.StatusOK, dashboardPayloadAll(state.getAll()))
 	})
 	mux.HandleFunc("/api/login/start", func(w http.ResponseWriter, r *http.Request) {
@@ -105,6 +160,8 @@ func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 			writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "login session not found or already used"})
 			return
 		}
+		success := false
+		defer func() { logins.finish(id, success) }()
 		ctx, cancel := context.WithTimeout(r.Context(), 16*time.Minute)
 		defer cancel()
 		proxy := loadProxy(opts)
@@ -118,11 +175,15 @@ func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
 			return
 		}
+		state.opMu.Lock()
+		defer state.opMu.Unlock()
 		path, err := saveAccountCredentials(creds)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
 			return
 		}
+		// Persisting the account consumes the code even if the subsequent usage read fails.
+		success = true
 		if _, err := os.Stat(defaultCBLAuthFile()); os.IsNotExist(err) {
 			_ = saveCredentials(defaultCBLAuthFile(), creds)
 		}
@@ -130,8 +191,8 @@ func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 		// as a side effect of adding an account.
 		refreshCtx, refreshCancel := context.WithTimeout(context.Background(), 45*time.Second)
 		defer refreshCancel()
-		snaps, refreshErr := LoadAll(refreshCtx, opts)
-		state.setAll(snaps, refreshErr)
+		state.refreshLocked(refreshCtx, opts)
+		_, refreshErr := state.getAll()
 		if refreshErr != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": refreshErr.Error()})
 			return
@@ -189,6 +250,7 @@ func dashboardPayloadAll(snaps []UsageSnapshot, err error) map[string]any {
 
 func accountCard(snap UsageSnapshot) map[string]any {
 	return map[string]any{
+		"error":         snap.Error,
 		"account_id":    snap.AccountID,
 		"account_email": snap.AccountEmail,
 		"account_name":  snap.AccountName,

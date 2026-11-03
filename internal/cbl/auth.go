@@ -103,7 +103,7 @@ func cblAccountsDir() string {
 func saveAccountCredentials(creds Credentials) (string, error) {
 	name := strings.TrimSpace(creds.AccountID)
 	if name == "" {
-		name = "account"
+		return "", fmt.Errorf("account_id is required to save account credentials")
 	}
 	name = safeFileName(name)
 	path := filepath.Join(cblAccountsDir(), name+".json")
@@ -113,16 +113,16 @@ func saveAccountCredentials(creds Credentials) (string, error) {
 func accountAuthFiles() []string {
 	paths := []string{}
 	seen := map[string]bool{}
-	for _, path := range defaultAuthFileCandidates() {
-		if _, err := os.Stat(path); err == nil && !seen[path] {
-			paths = append(paths, path)
-			seen[path] = true
-		}
-	}
+	// Native account files are authoritative after a new login. Legacy imports
+	// with the same identity must not shadow newly saved credentials.
 	matches, _ := filepath.Glob(filepath.Join(cblAccountsDir(), "*.json"))
 	sort.Strings(matches)
 	for _, path := range matches {
-		if !seen[path] {
+		paths = append(paths, path)
+		seen[path] = true
+	}
+	for _, path := range defaultAuthFileCandidates() {
+		if _, err := os.Stat(path); err == nil && !seen[path] {
 			paths = append(paths, path)
 			seen[path] = true
 		}

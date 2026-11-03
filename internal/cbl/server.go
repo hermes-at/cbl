@@ -10,10 +10,12 @@ import (
 )
 
 type cache struct {
-	mu    sync.RWMutex
-	snap  UsageSnapshot
-	snaps []UsageSnapshot
-	err   error
+	opMu        sync.Mutex // Serializes token refresh, login persistence and settings updates.
+	lastRefresh time.Time
+	mu          sync.RWMutex
+	snap        UsageSnapshot
+	snaps       []UsageSnapshot
+	err         error
 }
 
 func (c *cache) set(s UsageSnapshot, err error) {
@@ -48,6 +50,25 @@ func (c *cache) getAll() ([]UsageSnapshot, error) {
 	return append([]UsageSnapshot(nil), c.snaps...), c.err
 }
 
+func (c *cache) refreshLocked(ctx context.Context, opts Options) {
+	if ctx.Err() != nil {
+		return
+	}
+	snaps, err := LoadAll(ctx, opts)
+	c.setAll(snaps, err)
+	c.lastRefresh = time.Now()
+}
+
+func (c *cache) refresh(ctx context.Context, opts Options) {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
+	// Coalesce simultaneous refreshes and throttle repeated clicks at the backend.
+	if time.Since(c.lastRefresh) < 5*time.Second {
+		return
+	}
+	c.refreshLocked(ctx, opts)
+}
+
 func Watch(ctx context.Context, interval time.Duration, opts Options, out ioWriter) error {
 	refresh := func() error {
 		snap, err := Load(ctx, opts)
@@ -75,10 +96,7 @@ func Watch(ctx context.Context, interval time.Duration, opts Options, out ioWrit
 
 func Serve(ctx context.Context, addr string, interval time.Duration, opts Options) error {
 	state := &cache{}
-	refresh := func() {
-		snaps, err := LoadAll(ctx, opts)
-		state.setAll(snaps, err)
-	}
+	refresh := func() { state.refresh(ctx, opts) }
 	refresh()
 	go func() {
 		t := time.NewTicker(interval)
@@ -137,7 +155,7 @@ func Serve(ctx context.Context, addr string, interval time.Duration, opts Option
 		_ = json.NewEncoder(w).Encode(map[string]any{"text": snap.summaryLine(), "tooltip": snap.tooltip(), "class": snap.waybarClass()})
 	})
 
-	srv := &http.Server{Addr: addr, Handler: mux}
+	srv := &http.Server{Addr: addr, Handler: localOnly(mux), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second}
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
 	select {
