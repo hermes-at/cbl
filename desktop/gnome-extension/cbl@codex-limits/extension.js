@@ -8,12 +8,13 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import {accountErrorMessage, overallUsageState} from './ui-data.js';
+import {accountPresentation, AccountRemoval, overallUsageState} from './ui-data.js';
 
 const STATUS_URL = 'http://127.0.0.1:18088/api/status';
 const REFRESH_URL = 'http://127.0.0.1:18088/api/refresh';
 const LOGIN_START_URL = 'http://127.0.0.1:18088/api/login/start';
 const LOGIN_COMPLETE_URL = 'http://127.0.0.1:18088/api/login/complete';
+const ACCOUNTS_URL = 'http://127.0.0.1:18088/api/accounts';
 const REFRESH_SECONDS = 60;
 const MANUAL_REFRESH_COOLDOWN_MS = 5000;
 
@@ -146,7 +147,7 @@ class MiniMeter extends St.DrawingArea {
 
 const AccountCard = GObject.registerClass(
 class AccountCard extends St.BoxLayout {
-    _init(account) {
+    _init(account, onRemove, presentation = {}) {
         super._init({vertical: true, style_class: 'cbl-account-card'});
 
         const header = new St.BoxLayout({vertical: false, style_class: 'cbl-account-header'});
@@ -161,13 +162,27 @@ class AccountCard extends St.BoxLayout {
         });
         header.add_child(title);
         header.add_child(status);
+        if (/^[a-f0-9]{64}$/.test(account?.account_key || '')) {
+            const remove = new St.Button({
+                label: '×', style_class: 'cbl-account-remove',
+                accessible_name: `Удалить ${accountTitle(account)} из CBL`,
+                reactive: true, can_focus: true, track_hover: true,
+            });
+            remove.connect('clicked', () => onRemove(account));
+            header.add_child(remove);
+        }
         this.add_child(header);
 
+        this._state = new St.Label({text: '', style_class: 'cbl-account-state'});
+        this._detail = new St.Label({text: '', style_class: 'cbl-card-meta'});
+        this._detail.clutter_text.line_wrap = true;
+        this.add_child(this._state);
+        this.add_child(this._detail);
+        this._account = account;
+        this.setPresentation(presentation);
+
         const windows = account?.windows || [];
-        if (account?.error) {
-            const error = new St.Label({text: accountErrorMessage(account.error), style_class: 'cbl-card-meta'});
-            error.clutter_text.line_wrap = true;
-            this.add_child(error);
+        if (account?.error || (account?.status && account.status !== 'ready')) {
             return;
         }
         this._addMeter('5h', windows[0]);
@@ -175,6 +190,14 @@ class AccountCard extends St.BoxLayout {
         const credits = account?.credits?.text ?? '—';
         const creditsUsed = clamp(account?.credits?.used, 0, 100);
         this._addMeter('credits', {remaining: credits === '0.00' ? 0 : 100 - creditsUsed, label: credits});
+    }
+
+    setPresentation(options) {
+        const state = accountPresentation(this._account, options);
+        this._state.text = state.label;
+        this._state.style_class = `cbl-account-state cbl-state-${state.tone}`;
+        this._detail.text = state.detail || '';
+        this._detail.visible = Boolean(state.detail);
     }
 
     _addMeter(name, data) {
@@ -207,6 +230,7 @@ class CblIndicator extends PanelMenu.Button {
     _init(extension) {
         super._init(0.0, 'cbl');
         this._session = Soup.Session.new();
+        this._session.timeout = 30;
         this._extension = extension;
         this._loginID = '';
         this._latestUserCode = '';
@@ -216,6 +240,11 @@ class CblIndicator extends PanelMenu.Button {
         this._manualCooldownId = 0;
         this._manualCooldownUntil = 0;
         this._nextRefreshSeconds = REFRESH_SECONDS;
+        this._destroyed = false;
+        this._requestGeneration = 0;
+        this._applyTimeoutId = 0;
+        this._removal = new AccountRemoval();
+        this._cards = [];
 
         this._icon = new St.Icon({
             gicon: this._loadIcon('assets/cbl-symbolic.svg'),
@@ -258,6 +287,24 @@ class CblIndicator extends PanelMenu.Button {
 
         this._accountsBox = new St.BoxLayout({vertical: true, style_class: 'cbl-accounts-box'});
         this._content.add_child(this._accountsBox);
+
+        this._removeBox = new St.BoxLayout({vertical: true, style_class: 'cbl-remove-confirm'});
+        this._removeText = new St.Label({text: '', style_class: 'cbl-card-meta'});
+        this._removeText.clutter_text.line_wrap = true;
+        this._removeBox.add_child(this._removeText);
+        const removeActions = new St.BoxLayout({style_class: 'cbl-remove-actions'});
+        this._removeCancel = new St.Button({label: 'Отмена', style_class: 'cbl-confirm-button', can_focus: true});
+        this._removeConfirm = new St.Button({label: 'Удалить', style_class: 'cbl-confirm-button cbl-danger', can_focus: true});
+        this._removeCancel.connect('clicked', () => {
+            if (this._removal.cancel())
+                this._removeBox.hide();
+        });
+        this._removeConfirm.connect('clicked', () => this._confirmRemove());
+        removeActions.add_child(this._removeCancel);
+        removeActions.add_child(this._removeConfirm);
+        this._removeBox.add_child(removeActions);
+        this._content.add_child(this._removeBox);
+        this._removeBox.hide();
 
         this._loginBox = new St.BoxLayout({vertical: true, style_class: 'cbl-login-box'});
         this._loginText = new St.Label({text: 'To add an account: click “Add Account…”, confirm in the browser, then click “I confirmed login”.', style_class: 'cbl-card-meta'});
@@ -306,6 +353,13 @@ class CblIndicator extends PanelMenu.Button {
     }
 
     destroy() {
+        this._destroyed = true;
+        this._requestGeneration++;
+        this._session.abort();
+        if (this._applyTimeoutId) {
+            GLib.Source.remove(this._applyTimeoutId);
+            this._applyTimeoutId = 0;
+        }
         if (this._timerId) {
             GLib.Source.remove(this._timerId);
             this._timerId = 0;
@@ -334,6 +388,8 @@ class CblIndicator extends PanelMenu.Button {
         try {
             const message = Soup.Message.new(method, url);
             this._session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null, (session, res) => {
+                if (this._destroyed)
+                    return;
                 try {
                     const bytes = session.send_and_read_finish(res);
                     const text = decodeBytes(bytes);
@@ -373,12 +429,17 @@ class CblIndicator extends PanelMenu.Button {
     }
 
     refresh(showProgress = false) {
+        if (this._destroyed || this._removal.busy)
+            return;
         if (this._refreshing) {
             if (this._statusItem)
                 this._statusItem.label.text = 'Status: refreshing…';
             return;
         }
         this._refreshing = true;
+        const generation = this._requestGeneration;
+        if (showProgress)
+            this._setCardPresentation({updating: true});
         const startedAt = Date.now();
         const minVisibleMs = showProgress ? 1500 : 0;
         let finished = false;
@@ -389,7 +450,7 @@ class CblIndicator extends PanelMenu.Button {
             this._statusItem.label.text = 'Status: refreshing…';
 
         const finish = (payload, err) => {
-            if (finished)
+            if (finished || this._destroyed || generation !== this._requestGeneration)
                 return;
             finished = true;
             if (this._refreshTimeoutId) {
@@ -397,6 +458,9 @@ class CblIndicator extends PanelMenu.Button {
                 this._refreshTimeoutId = 0;
             }
             const apply = () => {
+                this._applyTimeoutId = 0;
+                if (this._destroyed || generation !== this._requestGeneration)
+                    return;
                 this._refreshing = false;
                 this._nextRefreshSeconds = REFRESH_SECONDS;
                 if (this._headerRefresh) {
@@ -414,7 +478,7 @@ class CblIndicator extends PanelMenu.Button {
             };
             const waitMs = Math.max(0, minVisibleMs - (Date.now() - startedAt));
             if (waitMs > 0) {
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, waitMs, () => {
+                this._applyTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, waitMs, () => {
                     apply();
                     return GLib.SOURCE_REMOVE;
                 });
@@ -434,14 +498,16 @@ class CblIndicator extends PanelMenu.Button {
     }
 
     _setIdleStatus() {
-        if (!this._statusItem || this._refreshing)
+        if (!this._statusItem || this._refreshing || this._removal.busy || this._serviceUnavailable)
             return;
         const base = this._hasAccountErrors ? 'account error' : this._hasAccounts ? 'OK' : 'waiting for first account';
         this._statusItem.label.text = `Status: ${base} · next refresh ${this._nextRefreshSeconds}s`;
     }
 
     _applyStatus(payload) {
+        this._serviceUnavailable = false;
         const accounts = payload.accounts || [];
+        this._backendRefreshing = Boolean(payload.refreshing);
         this._hasAccounts = accounts.length > 0;
         this._hasAccountErrors = accounts.some(account => account?.error);
         if (!accounts.length) {
@@ -467,6 +533,7 @@ class CblIndicator extends PanelMenu.Button {
     }
 
     _showNoAccounts() {
+        this._cards = [];
         this._accountsBox.destroy_all_children();
         const box = new St.BoxLayout({vertical: true, style_class: 'cbl-empty-card'});
         const title = new St.Label({text: 'Accounts: 0', style_class: 'cbl-empty-title'});
@@ -475,22 +542,77 @@ class CblIndicator extends PanelMenu.Button {
     }
 
     _applyAccounts(accounts) {
+        this._cards = [];
         this._accountsBox.destroy_all_children();
         if (!accounts || !accounts.length)
             return;
         for (const account of accounts) {
-            this._accountsBox.add_child(new AccountCard(account));
+            const card = new AccountCard(account, value => this._requestRemove(value), {updating: this._backendRefreshing});
+            this._cards.push(card);
+            this._accountsBox.add_child(card);
         }
     }
 
+    _setCardPresentation(options) {
+        for (const card of this._cards)
+            card.setPresentation(options);
+    }
+
+    _requestRemove(account) {
+        if (!this._removal.request(account.account_key, accountTitle(account)))
+            return;
+        this._removeText.text = `Удалить «${accountTitle(account)}» из CBL?\nЛокальная запись CBL будет удалена. Аккаунт OpenAI и вход в Codex CLI останутся без изменений.`;
+        this._removeConfirm.reactive = true;
+        this._removeCancel.reactive = true;
+        this._removeConfirm.label = 'Удалить';
+        this._removeBox.show();
+        this._removeCancel.grab_key_focus();
+    }
+
+    _confirmRemove() {
+        const key = this._removal.confirm();
+        if (!key)
+            return;
+        // Invalidate older responses so they cannot restore the removed card.
+        this._requestGeneration++;
+        for (const field of ['_refreshTimeoutId', '_applyTimeoutId']) {
+            if (this[field]) {
+                GLib.Source.remove(this[field]);
+                this[field] = 0;
+            }
+        }
+        this._refreshing = false;
+        this._removeConfirm.reactive = false;
+        this._removeCancel.reactive = false;
+        this._removeConfirm.label = 'Удаляется…';
+        this._statusItem.label.text = 'Status: удаление аккаунта…';
+        this._getJSON(`${ACCOUNTS_URL}?key=${encodeURIComponent(key)}`, 'DELETE', (payload, err) => {
+            const success = !err && payload?.ok;
+            this._removal.finish(success);
+            this._headerRefresh.label = '↻';
+            this._removeConfirm.reactive = true;
+            this._removeCancel.reactive = true;
+            this._removeConfirm.label = 'Удалить';
+            if (!success) {
+                this._removeText.text = 'Не удалось удалить аккаунт. Проверьте, что сервис CBL обновлён и доступен, затем повторите попытку.';
+                this._setCardPresentation({});
+                this._statusItem.label.text = 'Status: ошибка удаления';
+                return;
+            }
+            this._removeBox.hide();
+            this._applyStatus(payload);
+        });
+    }
+
     _applyError(err) {
+        this._serviceUnavailable = true;
         const message = 'Service unavailable';
         this._label.text = '•••';
         this._icon.gicon = this._stateIcon('error');
         this._subheading.text = 'service unavailable';
         this._badge.text = 'ERROR';
         this._badge.show();
-        this._accountsBox.destroy_all_children();
+        this._setCardPresentation({unavailable: true});
         this._statusItem.label.text = `Status: ${message}`;
     }
 

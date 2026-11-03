@@ -13,7 +13,8 @@ build-all: build build-tray
 test:
 	go test -race ./...
 	/usr/bin/python3 -m unittest discover -s install/ubuntu -p 'test_*.py'
-	node --test desktop/gnome-extension/cbl@codex-limits/ui-data.test.js
+	node --test desktop/gnome-extension/cbl@codex-limits/*.test.js
+	/usr/bin/python3 tests/test_account_api.py
 
 tidy:
 	go mod tidy

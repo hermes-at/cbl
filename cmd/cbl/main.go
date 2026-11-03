@@ -32,7 +32,7 @@ func run(ctx context.Context, args []string) error {
 	case "watch":
 		return runWatch(ctx, args[1:])
 	case "version", "--version", "-v":
-		fmt.Println("cbl v0.3.1")
+		fmt.Println("cbl v0.3.2-dev")
 		return nil
 	case "help", "--help", "-h":
 		return printHelp()

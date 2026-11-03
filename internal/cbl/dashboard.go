@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -66,6 +67,38 @@ func (s *loginSessions) finish(id string, success bool) {
 
 func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 	logins := newLoginSessions()
+	mux.HandleFunc("/api/accounts", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			w.Header().Set("Allow", http.MethodDelete)
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "DELETE required"})
+			return
+		}
+		key := r.URL.Query().Get("key")
+		if !validAccountKey(key) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid account key"})
+			return
+		}
+		state.opMu.Lock()
+		defer state.opMu.Unlock()
+		if err := removeAccount(key, opts); err != nil {
+			status, message := http.StatusInternalServerError, "could not remove account; check CBL storage"
+			if errors.Is(err, errAccountNotFound) {
+				status, message = http.StatusNotFound, "account not found"
+			}
+			writeJSON(w, status, map[string]any{"ok": false, "error": message})
+			return
+		}
+		snaps, currentErr := state.getAll()
+		kept := make([]UsageSnapshot, 0, len(snaps))
+		for _, snap := range snaps {
+			if snap.AccountKey != key {
+				kept = append(kept, snap)
+			}
+		}
+		state.setAll(kept, currentErr)
+		state.lastRefresh = time.Time{}
+		writeJSON(w, http.StatusOK, state.payload())
+	})
 	mux.HandleFunc("/api/settings", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -110,7 +143,7 @@ func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 	})
 	mux.HandleFunc("/dashboard", handleDashboard)
 	mux.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, dashboardPayloadAll(state.getAll()))
+		writeJSON(w, http.StatusOK, state.payload())
 	})
 	mux.HandleFunc("/api/refresh", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -121,7 +154,7 @@ func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
 		ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 		defer cancel()
 		state.refresh(ctx, opts)
-		writeJSON(w, http.StatusOK, dashboardPayloadAll(state.getAll()))
+		writeJSON(w, http.StatusOK, state.payload())
 	})
 	mux.HandleFunc("/api/login/start", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -250,6 +283,9 @@ func dashboardPayloadAll(snaps []UsageSnapshot, err error) map[string]any {
 
 func accountCard(snap UsageSnapshot) map[string]any {
 	return map[string]any{
+		"account_key":   snap.AccountKey,
+		"status":        snap.Status,
+		"fetched_at":    snap.FetchedAt,
 		"error":         snap.Error,
 		"account_id":    snap.AccountID,
 		"account_email": snap.AccountEmail,

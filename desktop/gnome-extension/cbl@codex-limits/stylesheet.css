@@ -169,6 +169,48 @@
   background-color: #f5c542;
 }
 
+.cbl-account-state {
+  font-size: 11px;
+  color: #a8a8b3;
+}
+
+.cbl-state-ready { color: #2ed36f; }
+.cbl-state-warning { color: #f5c542; }
+.cbl-state-error { color: #ff7373; }
+.cbl-state-updating { color: #a8c7fa; }
+
+.cbl-account-remove {
+  color: #a8a8b3;
+  border-radius: 6px;
+  padding: 0 5px;
+  font-size: 16px;
+}
+
+.cbl-account-remove:hover,
+.cbl-account-remove:focus {
+  color: #ff7373;
+  background-color: #343036;
+}
+
+.cbl-remove-confirm {
+  background-color: #202020;
+  border: 1px solid #7f4148;
+  border-radius: 12px;
+  padding: 10px;
+  spacing: 10px;
+}
+
+.cbl-remove-actions { spacing: 8px; }
+.cbl-confirm-button {
+  background-color: #323236;
+  color: #f4f4f5;
+  border-radius: 6px;
+  padding: 5px 10px;
+}
+.cbl-confirm-button:hover,
+.cbl-confirm-button:focus { background-color: #494950; }
+.cbl-danger { color: #ff8f8f; }
+
 .cbl-progress-fill:critical {
   background-color: #ff5c5c;
 }

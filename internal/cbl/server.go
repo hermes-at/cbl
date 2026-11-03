@@ -16,6 +16,7 @@ type cache struct {
 	snap        UsageSnapshot
 	snaps       []UsageSnapshot
 	err         error
+	refreshing  bool
 }
 
 func (c *cache) set(s UsageSnapshot, err error) {
@@ -50,10 +51,24 @@ func (c *cache) getAll() ([]UsageSnapshot, error) {
 	return append([]UsageSnapshot(nil), c.snaps...), c.err
 }
 
+func (c *cache) payload() map[string]any {
+	c.mu.RLock()
+	snaps := append([]UsageSnapshot(nil), c.snaps...)
+	err, refreshing := c.err, c.refreshing
+	c.mu.RUnlock()
+	payload := dashboardPayloadAll(snaps, err)
+	payload["refreshing"] = refreshing
+	return payload
+}
+
 func (c *cache) refreshLocked(ctx context.Context, opts Options) {
 	if ctx.Err() != nil {
 		return
 	}
+	c.mu.Lock()
+	c.refreshing = true
+	c.mu.Unlock()
+	defer func() { c.mu.Lock(); c.refreshing = false; c.mu.Unlock() }()
 	snaps, err := LoadAll(ctx, opts)
 	c.setAll(snaps, err)
 	c.lastRefresh = time.Now()

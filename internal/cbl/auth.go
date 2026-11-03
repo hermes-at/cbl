@@ -101,13 +101,32 @@ func cblAccountsDir() string {
 }
 
 func saveAccountCredentials(creds Credentials) (string, error) {
+	accountStorageMu.Lock()
+	defer accountStorageMu.Unlock()
+	if err := checkAccountStorage(true); err != nil {
+		return "", err
+	}
+	removed, err := readRemovedAccounts()
+	if err != nil {
+		return "", err
+	}
 	name := strings.TrimSpace(creds.AccountID)
 	if name == "" {
 		return "", fmt.Errorf("account_id is required to save account credentials")
 	}
 	name = safeFileName(name)
 	path := filepath.Join(cblAccountsDir(), name+".json")
-	return path, saveCredentials(path, creds)
+	if err := saveCredentials(path, creds); err != nil {
+		return "", err
+	}
+	key := accountKey(creds, path)
+	if removed[key] {
+		delete(removed, key)
+		if err := writeRemovedAccounts(removed); err != nil {
+			return "", err
+		}
+	}
+	return path, nil
 }
 
 func accountAuthFiles() []string {

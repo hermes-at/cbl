@@ -2,7 +2,7 @@
   "uuid": "cbl@codex-limits",
   "name": "cbl",
   "description": "Codex usage for the GNOME top bar.",
-  "version": 24,
+  "version": 25,
   "shell-version": [
     "45",
     "46",

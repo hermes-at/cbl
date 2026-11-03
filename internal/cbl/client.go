@@ -109,14 +109,22 @@ func Load(ctx context.Context, opts Options) (UsageSnapshot, error) {
 }
 
 func LoadAll(ctx context.Context, opts Options) ([]UsageSnapshot, error) {
-	if strings.TrimSpace(opts.AuthFile) != "" || strings.TrimSpace(os.Getenv("CBL_AUTH_FILE")) != "" || strings.TrimSpace(opts.Fixture) != "" || strings.TrimSpace(os.Getenv("CBL_FIXTURE")) != "" {
+	removed, err := readRemovedAccounts()
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(opts.Fixture) != "" || strings.TrimSpace(os.Getenv("CBL_FIXTURE")) != "" {
 		snap, err := Load(ctx, opts)
 		if err != nil {
 			return nil, err
 		}
+		snap.Status = "ready"
 		return []UsageSnapshot{snap}, nil
 	}
 	files := accountAuthFiles()
+	if explicit := firstNonEmpty(opts.AuthFile, os.Getenv("CBL_AUTH_FILE")); explicit != "" {
+		files = []string{explicit}
+	}
 	if len(files) == 0 {
 		return []UsageSnapshot{}, nil
 	}
@@ -130,18 +138,15 @@ func LoadAll(ctx context.Context, opts Options) ([]UsageSnapshot, error) {
 	seen := map[string]bool{}
 	for _, path := range files {
 		creds, err := loadCredentials(Options{AuthFile: path, ConfigFile: opts.ConfigFile, BaseURL: opts.BaseURL, Proxy: opts.Proxy})
-		if err != nil {
-			snaps = append(snaps, UsageSnapshot{AccountID: filepath.Base(path), Error: err.Error()})
-			continue
-		}
-		key := creds.AccountID
-		if key == "" {
-			key = path
-		}
-		if seen[key] {
+		key := accountKey(creds, path)
+		if removed[key] || seen[key] {
 			continue
 		}
 		seen[key] = true
+		if err != nil {
+			snaps = append(snaps, UsageSnapshot{AccountID: filepath.Base(path), AccountKey: key, Status: accountStatus(err), Error: err.Error()})
+			continue
+		}
 		snap, err := fetchUsage(ctx, client, creds, baseURL)
 		if err != nil {
 			var usageErr *UsageHTTPError
@@ -158,6 +163,8 @@ func LoadAll(ctx context.Context, opts Options) ([]UsageSnapshot, error) {
 		if err != nil {
 			snap = UsageSnapshot{Error: err.Error()}
 		}
+		snap.AccountKey = key
+		snap.Status = accountStatus(err)
 		applyCredentialMetadata(&snap, creds)
 		snap.ProfileName = loadUserConfig(opts).ProfileName
 		snap.Proxy = proxy

@@ -26,6 +26,12 @@ It gives you:
 
 CBL does **not** require Codex CLI. It stores its own login data in `~/.config/cbl`.
 
+## Next update (not released yet)
+
+- Account cards have a **×** button. The first click opens a confirmation with **Отмена** (Cancel) focused by default; only **Удалить** (Delete) removes the account from CBL.
+- Removal deletes CBL-only credentials, leaves other accounts and Codex CLI authorization untouched, and prevents automatic re-import of the removed account. Shared CLI authorization files are preserved even when `CODEX_HOME` points inside CBL storage. Add it again explicitly with **Add Account…** to restore it. This does not delete the OpenAI account or revoke its remote sessions.
+- Each card distinguishes refreshing, current data (with update time), login required, connection errors and other request failures. A local-service failure keeps existing cards visible but marks them unavailable.
+
 ## What's new in v0.3.1
 
 - Restores the original polished GNOME top-bar popup; no separate main window.
