@@ -1,100 +1,191 @@
 # CBL — Codex Bar for Linux
 
-CBL is a standalone Linux desktop app for ChatGPT/Codex usage limits: a native GTK window, an AppIndicator panel icon, and a background Go service.
-**CBL no longer uses a GNOME Shell extension.**
+CBL is a small Linux desktop app that shows your ChatGPT/Codex usage limits in the GNOME top bar.
+It supports multiple accounts, shows 5-hour / weekly / credits usage, and lets you add accounts from the popup without using the terminal.
 
 [Русская версия](README.ru.md)
 
-## Components
+<p align="center">
+  <img src="docs/assets/cbl-gnome-popup.jpg" alt="CBL GNOME popup with three Codex profiles and reset times" width="390">
+</p>
 
-- `cbl serve`: background service, account storage and usage refresh.
-- `cbl-app`: standalone window with account cards, limits/reset times, device-code login and proxy settings.
-- `cbl-tray`: panel indicator; opens the application window.
-- Local HTTP and Waybar output remain available.
+## Why use it?
 
-Closing the window does not stop the background service. Codex CLI is not required.
+CBL answers one simple question: **how much Codex usage do I have left right now?**
 
-## Install / upgrade from this checkout
+It gives you:
 
-Standalone desktop is available in **v0.3.0**. To install/update from the published release:
+- a compact GNOME top-bar indicator;
+- a popup with one card per account;
+- account email/name labels when available;
+- 5h, weekly, and credits progress bars;
+- manual refresh with spam protection;
+- automatic refresh every minute;
+- a built-in device-code login flow;
+- a local HTTP API for panels and custom integrations.
+
+CBL does **not** require Codex CLI. It stores its own login data in `~/.config/cbl`.
+
+## What's new in v0.3.1
+
+- Restores the original polished GNOME top-bar popup; no separate main window.
+- Keeps the v0.3.0 backend fixes for direct proxy mode, account errors, atomic token writes and refresh coordination.
+- Upgrade removes the v0.3.0 desktop launcher/tray autostart in GNOME mode while preserving saved accounts and proxy configuration. Do not uninstall before upgrading.
+
+### Existing connection and reset-time features
+
+- The popup now shows the local **reset date and time** below each `5h` and `week` meter whenever OpenAI returns it.
+- Extension settings now include **Connection**: enable/disable proxying and edit the proxy URL without opening a terminal.
+- With **Use proxy** off, CBL makes a direct connection and bypasses saved and service-level proxy settings.
+
+## Quick links
+
+### Install / update on Ubuntu GNOME
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/install.sh | bash -s -- --systemd --extension
 ```
 
-Ubuntu desktop runtime dependencies:
+Configure a proxy after installation in **GNOME Extensions → cbl → Connection**.
+
+After install, if needed:
 
 ```bash
-sudo apt install python3-gi gir1.2-gtk-3.0 libayatana-appindicator3-1
+systemctl --user restart cbl.service
+gnome-extensions enable cbl@codex-limits
+gnome-extensions info cbl@codex-limits
 ```
 
-For source builds also install Go 1.23+, a C compiler, pkg-config and `libayatana-appindicator3-dev`.
-Run as your regular desktop user, **not root**:
+On GNOME Wayland, log out of your Linux user session and log back in after installing or updating CBL. GNOME Shell can keep old extension code in memory until the user session is restarted.
 
-```bash
-./install.sh
+Expected state:
+
+```text
+State: ACTIVE
 ```
 
-The installer sets up the window, user service and tray autostart. Legacy `--systemd --extension` is accepted as a migration alias but installs no CBL Shell extension. Upgrade removes old CBL extension files and **preserves `~/.config/cbl` accounts and configuration**. Do not uninstall before upgrading.
+### Full uninstall
 
-On GNOME the panel icon requires the desktop's AppIndicator support (Ubuntu AppIndicators, or AppIndicator/KStatusNotifierItem support on vanilla GNOME). That desktop integration is separate from CBL: no CBL-specific Shell extension is installed. The window works without panel support. GNOME may retain the old extension until logout/login.
-
-Launch **CBL** from Applications or run:
+This removes the user service, binaries, tray autostart, GNOME extension, and `~/.config/cbl` account/config files.
 
 ```bash
-~/.local/bin/cbl-app
-systemctl --user status cbl.service
+curl -fsSL https://raw.githubusercontent.com/hermes-at/cbl/main/uninstall.sh | bash
 ```
 
-## Usage
+## How to add an account
 
-- Open CBL from the panel menu or Applications.
-- Refresh manually or let the service refresh automatically.
-- Add an account, open the OpenAI confirmation page, copy the code and confirm login.
-- Connection settings enable/disable proxying and save an HTTP(S) or SOCKS5 proxy URL.
-- Failed accounts remain visible with an error instead of silently disappearing.
+1. Install CBL with the command above.
+2. Log out of your Linux user session and log back in, especially on GNOME Wayland.
+3. Open the GNOME top-bar indicator: `•••`.
+4. Click **Add Account…**.
+5. CBL opens the OpenAI device confirmation page in your browser.
+6. The popup shows a one-time **Code**.
+7. Click the **Code** row to copy it, then paste it in the browser.
+8. After confirming in the browser, click **I confirmed login** in the popup.
+9. CBL refreshes immediately and the account card appears.
 
-A disabled proxy means direct requests, including when `CBL_PROXY` exists in the service environment.
+You can repeat this flow to add more accounts. Each account gets its own card.
 
-## Build and tests
+## How to use it
+
+- Open the top-bar `•••` indicator to see all account cards.
+- The `5h` row shows the remaining short usage window.
+- The `week` row shows the remaining weekly usage window.
+- When OpenAI returns a reset timestamp, CBL shows the local reset date and time below the corresponding `5h` or `week` meter.
+- The `credits` row shows available credits when the account reports them.
+- Click the refresh button in the popup header to refresh manually.
+- Manual refresh is throttled so repeated clicks do not spam requests.
+- The status line shows when the next automatic refresh will happen.
+
+## Connection settings
+
+Open the extension settings from GNOME Extensions (click the gear icon next to CBL). The **Connection** section has a **Use proxy** switch and a **Proxy URL** field.
+
+<p align="center">
+  <img src="docs/assets/cbl-gnome-settings.jpg" alt="CBL Connection settings with Use proxy and Proxy URL" width="480">
+</p>
+
+- Turn **Use proxy** on to use the specified `http://`, `https://`, `socks5://`, or `socks5h://` URL.
+- Turn it off for a direct connection. This bypasses saved and service-level proxy settings for CBL.
+- Refresh the popup after saving to apply the choice immediately; the next scheduled refresh also uses it. On GNOME Wayland, log out and back in after installing/updating the extension so GNOME Shell loads the new version.
+
+## Local commands
 
 ```bash
-make test
-go vet ./...
-make build-all
-VERSION=v0.3.0 ./release/package-release.sh
-```
-
-GTK runtime smoke tests require a graphical session or an isolated virtual display. Unit tests do not require real OpenAI accounts.
-
-## Local API and CLI
-
-The service listens on `127.0.0.1:18088`. Do not expose account APIs to the network.
-
-```bash
+cbl status
 cbl status --json
 cbl status --waybar
 cbl serve --addr 127.0.0.1:18088
+```
+
+## Local HTTP API
+
+When the user service is running, CBL exposes:
+
+```bash
 curl http://127.0.0.1:18088/api/status
 curl http://127.0.0.1:18088/waybar
 ```
 
-Desktop API: `GET /api/status`, `POST /api/refresh`, `GET/POST /api/settings`, `POST /api/login/start`, `POST /api/login/complete?id=...`.
+The GNOME extension reads this local API.
 
-## Files
+## Build from source
 
-- `~/.local/bin/cbl`, `cbl-tray`, `cbl-app` (and its Python module)
-- `~/.local/share/applications/cbl.desktop`
-- `~/.config/autostart/cbl-indicator.desktop`
-- `~/.config/systemd/user/cbl.service`
-- `~/.config/cbl/config.json`, `accounts/*.json`
+Requirements:
 
-Environment: `CBL_AUTH_FILE`, `CBL_CONFIG_FILE`, `CBL_BASE_URL`, `CBL_PROXY`, `CBL_FIXTURE`.
+- Go 1.23+;
+- `bash`, `curl`, `tar`, `python3`;
+- GNOME Shell + `gnome-extensions` for the GNOME popup;
+- optional: `libayatana-appindicator3-dev` for the tray fallback.
 
-## Full uninstall
-
-**This removes saved accounts and configuration too.** It is not needed for upgrades.
+Clone and build:
 
 ```bash
-./uninstall.sh
+git clone https://github.com/hermes-at/cbl.git
+cd cbl
+go test ./...
+go build -o cbl ./cmd/cbl
+go build -o cbl-tray ./cmd/cbl-tray
 ```
+
+Install from a checkout:
+
+```bash
+./install.sh --systemd --extension
+```
+
+Package release artifacts:
+
+```bash
+VERSION=v0.0.0-dev ./release/package-release.sh
+```
+
+Package only the GNOME extension zip:
+
+```bash
+./install/ubuntu/package-gnome-extension.sh
+```
+
+## Config and files
+
+CBL uses per-user files only:
+
+- `~/.local/bin/cbl`
+- `~/.local/bin/cbl-tray`
+- `~/.config/systemd/user/cbl.service`
+- `~/.config/cbl/config.json`
+- `~/.config/cbl/accounts/*.json`
+- `~/.local/share/gnome-shell/extensions/cbl@codex-limits`
+
+Environment variables:
+
+- `CBL_AUTH_FILE` — override legacy single-account auth path;
+- `CBL_CONFIG_FILE` — override config path;
+- `CBL_BASE_URL` — override ChatGPT base URL;
+- `CBL_FIXTURE` — offline JSON fixture for tests/development.
+
+## Notes
+
+- CBL is intentionally focused on Codex usage visibility.
+- The default Ubuntu/GNOME path is systemd user service + GNOME Shell extension.
+- Non-GNOME desktops can use the AppIndicator tray fallback or the local HTTP/Waybar output.

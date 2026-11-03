@@ -1,13 +1,17 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
-func TestAppArguments(t *testing.T) {
-	if len(appArguments(false)) != 0 {
-		t.Fatal("opening window must not start login")
-	}
-	args := appArguments(true)
-	if len(args) != 1 || args[0] != "--login" {
-		t.Fatalf("login args: %v", args)
+func TestProgressLineBounds(t *testing.T) {
+	for _, test := range []struct {
+		used int
+		want string
+	}{{-1, "0% used"}, {0, "0% used"}, {100, "100% used"}, {150, "100% used"}} {
+		if got := progressLine(100-test.used, test.used); !strings.Contains(got, test.want) {
+			t.Fatalf("got %q want %q", got, test.want)
+		}
 	}
 }

@@ -22,7 +22,7 @@ import shutil, sys
 source, target = map(Path, sys.argv[1:])
 for name in ('install', 'desktop'):
     shutil.copytree(source / name, target / name, dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns('__pycache__', '*.pyc', 'test_*.py'))
+                    ignore=shutil.ignore_patterns('__pycache__', '*.pyc', 'test_*.py', '*.test.js'))
 PY
 cp "$ROOT_DIR/README.md" "$BIN_DIR/README.md"
 cp "$ROOT_DIR/README.ru.md" "$BIN_DIR/README.ru.md"

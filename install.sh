@@ -3,10 +3,10 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [--all|--systemd|--indicator]
+Usage: install.sh [--systemd] [--extension|--indicator|--all]
 
-Installs a standalone CBL window, background user service and panel indicator.
-Legacy --extension is accepted for migration; no GNOME Shell extension is installed.
+Default on GNOME: background service and the original top-bar popup.
+No standalone application window. Existing accounts/settings are preserved.
 EOF
 }
 
