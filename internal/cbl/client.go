@@ -27,9 +27,10 @@ func (e *UsageHTTPError) Error() string {
 }
 
 type usageResponse struct {
-	AccountID string `json:"account_id"`
-	PlanType  string `json:"plan_type"`
-	RateLimit struct {
+	ResetCredits json.RawMessage `json:"rate_limit_reset_credits"`
+	AccountID    string          `json:"account_id"`
+	PlanType     string          `json:"plan_type"`
+	RateLimit    struct {
 		PrimaryWindow   *apiWindow `json:"primary_window"`
 		SecondaryWindow *apiWindow `json:"secondary_window"`
 		IndividualLimit *apiLimit  `json:"individual_limit"`
@@ -248,7 +249,15 @@ func fetchUsage(ctx context.Context, client *http.Client, creds Credentials, bas
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return UsageSnapshot{}, &UsageHTTPError{StatusCode: resp.StatusCode, Status: resp.Status, Body: strings.TrimSpace(string(body))}
 	}
-	return mapFromBytes(body, baseURL)
+	snap, err := mapFromBytes(body, baseURL)
+	if err == nil && snap.ResetCredits != nil && snap.ResetCredits.AvailableCount != nil && *snap.ResetCredits.AvailableCount > 0 {
+		// Optional details must never make working usage unavailable.
+		if details := fetchResetCreditDetails(ctx, client, request); details != nil {
+			details.ApplicableAvailableCount = snap.ResetCredits.ApplicableAvailableCount
+			snap.ResetCredits = details
+		}
+	}
+	return snap, err
 }
 
 func mapFromBytes(data []byte, baseURL string) (UsageSnapshot, error) {
@@ -264,12 +273,13 @@ func mapFromBytes(data []byte, baseURL string) (UsageSnapshot, error) {
 func mapSnapshot(resp usageResponse, baseURL string) UsageSnapshot {
 	now := time.Now().UTC()
 	snap := UsageSnapshot{
-		AccountID:   resp.AccountID,
-		ProfileName: "",
-		PlanType:    resp.PlanType,
-		FetchedAt:   now,
-		Source:      "oauth",
-		BaseURL:     baseURL,
+		AccountID:    resp.AccountID,
+		ProfileName:  "",
+		PlanType:     resp.PlanType,
+		FetchedAt:    now,
+		Source:       "oauth",
+		BaseURL:      baseURL,
+		ResetCredits: parseResetCreditSummary(resp.ResetCredits),
 	}
 	if resp.RateLimit.PrimaryWindow != nil {
 		win := mapWindow(*resp.RateLimit.PrimaryWindow, "5h")

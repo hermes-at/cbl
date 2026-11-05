@@ -66,6 +66,19 @@ func (s *loginSessions) finish(id string, success bool) {
 }
 
 func registerUIHandlers(mux *http.ServeMux, state *cache, opts Options) {
+	// Redemption stays explicitly unavailable until the provider's request-ID
+	// contract is verified. Never guess it or issue a live reset as a probe.
+	mux.HandleFunc("/api/reset-credits/use", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "error_code": "method_not_allowed"})
+			return
+		}
+		w.WriteHeader(http.StatusNotImplemented)
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "error_code": "reset_unavailable"})
+	})
 	logins := newLoginSessions()
 	mux.HandleFunc("/api/accounts", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
@@ -282,7 +295,7 @@ func dashboardPayloadAll(snaps []UsageSnapshot, err error) map[string]any {
 }
 
 func accountCard(snap UsageSnapshot) map[string]any {
-	return map[string]any{
+	card := map[string]any{
 		"account_key":   snap.AccountKey,
 		"status":        snap.Status,
 		"fetched_at":    snap.FetchedAt,
@@ -296,6 +309,10 @@ func accountCard(snap UsageSnapshot) map[string]any {
 		"windows":       usageCards(snap),
 		"credits":       creditCard(snap),
 	}
+	if snap.ResetCredits != nil {
+		card["reset_credits"] = snap.ResetCredits
+	}
+	return card
 }
 
 func accountLabel(snap UsageSnapshot) string {

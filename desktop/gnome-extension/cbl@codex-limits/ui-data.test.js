@@ -55,3 +55,20 @@ removal.finish(true);
 assert.equal(removal.pending, null);
 assert.equal(removal.confirm(), null);
 console.log('UI states and confirmed account-removal transitions verified');
+
+const {resetCreditPresentation} = await import('./ui-data.js');
+for (const credits of [undefined, null, {}, {available_count: null}, {available_count: 0}, {available_count: -1}, {available_count: '2'}]) {
+    assert.equal(resetCreditPresentation(credits).visible, false);
+}
+assert.deepEqual(resetCreditPresentation({available_count: 2, applicable_available_count: 0}), {
+    visible: true, badge: '↺ 2', label: 'Resets: 2 · expiry unavailable', offers: [],
+});
+const offers = [
+    {offer_key: other, scope: 'full', expires_at: '2099-12-01T20:59:00Z'},
+    {offer_key: key, scope: 'full', expires_at: '2099-11-30T19:20:00Z'},
+];
+const resetView = resetCreditPresentation({available_count: 2, offers});
+assert.equal(resetView.offers[0].offer_key, key);
+assert.match(resetView.label, /Next expiry/);
+assert.equal(resetCreditPresentation({available_count: 0, offers: [{...offers[0], expires_at: '2000-01-01T00:00:00Z'}]}).visible, false);
+console.log('Reset inventory, unknown details and expiry ordering verified');

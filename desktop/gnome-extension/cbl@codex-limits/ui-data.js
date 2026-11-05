@@ -87,3 +87,24 @@ export function overallUsageState(accounts) {
     const worst = Math.min(...accounts.map(accountWorstRemaining));
     return worst <= 10 ? 'critical' : worst <= 30 ? 'warning' : 'good';
 }
+
+export function resetCreditOffers(credits, now = Date.now()) {
+    if (!credits || !Array.isArray(credits.offers)) return [];
+    return credits.offers.filter(o => /^[a-f0-9]{64}$/.test(o?.offer_key || '') && ['full','primary','secondary','unknown'].includes(o?.scope) && (!o.expires_at || (Number.isFinite(Date.parse(o.expires_at)) && Date.parse(o.expires_at) > now))).map(o => ({...o, expiry:o.expires_at ? Date.parse(o.expires_at) : null})).sort((a,b) => (a.expiry ?? Infinity) - (b.expiry ?? Infinity));
+}
+
+export function resetCreditPresentation(credits, now = Date.now()) {
+    const offers = resetCreditOffers(credits, now);
+    const count = Number.isInteger(credits?.available_count) && credits.available_count >= 0
+        ? credits.available_count : null;
+    const visible = (count !== null && count > 0) || offers.length > 0;
+    const nearest = offers.find(offer => offer.expiry !== null);
+    return {
+        visible,
+        badge: `↺ ${count ?? offers.length}`,
+        label: nearest
+            ? `Next expiry: ${new Date(nearest.expiry).toLocaleString('en-GB', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})}`
+            : `Resets: ${count ?? offers.length} · expiry unavailable`,
+        offers,
+    };
+}

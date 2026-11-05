@@ -8,13 +8,14 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import {accountPresentation, AccountRemoval, overallUsageState, loginErrorPresentation} from './ui-data.js';
+import {accountPresentation, AccountRemoval, overallUsageState, loginErrorPresentation, resetCreditPresentation} from './ui-data.js';
 
 const STATUS_URL = 'http://127.0.0.1:18088/api/status';
 const REFRESH_URL = 'http://127.0.0.1:18088/api/refresh';
 const LOGIN_START_URL = 'http://127.0.0.1:18088/api/login/start';
 const LOGIN_COMPLETE_URL = 'http://127.0.0.1:18088/api/login/complete';
 const ACCOUNTS_URL = 'http://127.0.0.1:18088/api/accounts';
+const RESET_USE_URL = 'http://127.0.0.1:18088/api/reset-credits/use';
 const REFRESH_SECONDS = 60;
 const MANUAL_REFRESH_COOLDOWN_MS = 5000;
 
@@ -168,7 +169,7 @@ class MiniMeter extends St.DrawingArea {
 
 const AccountCard = GObject.registerClass(
 class AccountCard extends St.BoxLayout {
-    _init(account, onRemove, presentation = {}) {
+    _init(account, onRemove, presentation = {}, onReset = () => {}) {
         super._init({vertical: true, style_class: 'cbl-account-card'});
         this._meters = [];
 
@@ -178,12 +179,17 @@ class AccountCard extends St.BoxLayout {
             style_class: 'cbl-account-title',
             x_expand: true,
         });
+        const statusRow = new St.BoxLayout({vertical: false, style_class: 'cbl-plan-row', y_align: Clutter.ActorAlign.CENTER});
         const status = new St.Label({
             text: account?.plan || 'unknown',
             style_class: 'cbl-plan-pill',
+            y_align: Clutter.ActorAlign.CENTER,
         });
+        statusRow.add_child(status);
+        const resetView = resetCreditPresentation(account?.reset_credits);
+
         header.add_child(title);
-        header.add_child(status);
+        header.add_child(statusRow);
         if (/^[a-f0-9]{64}$/.test(account?.account_key || '')) {
             const remove = new St.Button({
                 label: '×', style_class: 'cbl-account-remove',
@@ -212,6 +218,49 @@ class AccountCard extends St.BoxLayout {
         const credits = account?.credits?.text ?? '—';
         const creditsUsed = clamp(account?.credits?.used, 0, 100);
         this._addMeter('credits', {remaining: credits === '0.00' ? 0 : 100 - creditsUsed, label: credits});
+        if (resetView.visible) {
+            const details = new St.BoxLayout({vertical: true, style_class: 'cbl-reset-details'});
+            details.visible = false;
+            const count = Number.isInteger(account?.reset_credits?.available_count)
+                ? account.reset_credits.available_count : resetView.offers.length;
+            const note = resetView.offers.length ? new St.Button({
+                label: '▾', style_class: 'cbl-reset-toggle',
+                can_focus: true, reactive: true, track_hover: true,
+                accessible_name: 'Show reset offers',
+            }) : new St.Label({text: resetView.label, style_class: 'cbl-reset-note'});
+            if (resetView.offers.length) {
+                note.connect('clicked', () => {
+                    details.visible = !details.visible;
+                    note.label = details.visible ? '▴' : '▾';
+                    note.accessible_name = details.visible ? 'Hide reset offers' : 'Show reset offers';
+                });
+                for (const offer of resetView.offers) {
+                    const scope = offer.scope === 'full' ? 'Full · week + 5h' : 'Reset limits';
+                    const expiry = offer.expiry === null ? 'Expiry unknown' : `Use by ${new Date(offer.expiry).toLocaleString('en-US', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZoneName: 'short'})}`;
+                    const row = new St.BoxLayout({vertical: false, style_class: 'cbl-reset-offer'});
+                    const info = new St.Label({text: `${scope}\n${expiry}`, style_class: 'cbl-reset-note', x_expand: true});
+                    info.clutter_text.line_wrap = true;
+                    row.add_child(info);
+                    const use = new St.Button({label: 'Apply', style_class: 'cbl-reset-use', can_focus: true, reactive: true, track_hover: true, y_align: Clutter.ActorAlign.CENTER, accessible_name: 'Apply reset credit'});
+                    use.connect('clicked', () => onReset(account, offer));
+                    row.add_child(use);
+                    details.add_child(row);
+                }
+            } else {
+                note.clutter_text.line_wrap = true;
+            }
+            if (resetView.offers.length) {
+                const summary = new St.BoxLayout({vertical: false, style_class: 'cbl-reset-summary'});
+                const label = new St.Label({text: `Resets: ${count}`, style_class: 'cbl-reset-note', x_expand: true, y_align: Clutter.ActorAlign.CENTER});
+                summary.add_child(label);
+                summary.add_child(note);
+                this.add_child(summary);
+                this.add_child(new St.Label({text: resetView.label, style_class: 'cbl-reset-note'}));
+            } else {
+                this.add_child(note);
+            }
+            this.add_child(details);
+        }
     }
 
     setPresentation(options) {
@@ -269,6 +318,7 @@ class CblIndicator extends PanelMenu.Button {
         this._requestGeneration = 0;
         this._applyTimeoutId = 0;
         this._removal = new AccountRemoval();
+
         this._cards = [];
 
         this._icon = new St.Icon({
@@ -435,9 +485,11 @@ class CblIndicator extends PanelMenu.Button {
         return Gio.FileIcon.new(Gio.File.new_for_path(iconPath));
     }
 
-    _getJSON(url, method, callback) {
+    _getJSON(url, method, callback, body = null) {
         try {
             const message = Soup.Message.new(method, url);
+            if (body !== null)
+                message.set_request_body_from_bytes('application/json', new GLib.Bytes(new TextEncoder().encode(JSON.stringify(body))));
             this._session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null, (session, res) => {
                 if (this._destroyed)
                     return;
@@ -453,6 +505,62 @@ class CblIndicator extends PanelMenu.Button {
         } catch (err) {
             callback(null, err);
         }
+    }
+
+    _requestReset(account, offer) {
+        if (this._resetBusy || !/^[a-f0-9]{64}$/.test(account?.account_key || '')) return;
+        if (!this._resetBox) {
+            this._resetBox = new St.BoxLayout({vertical: true, style_class: 'cbl-remove-confirm'});
+            this._resetText = new St.Label({text: '', style_class: 'cbl-card-meta'});
+            this._resetText.clutter_text.line_wrap = true;
+            this._resetBox.add_child(this._resetText);
+            const actions = new St.BoxLayout({style_class: 'cbl-remove-actions'});
+            this._resetCancel = new St.Button({label: 'Cancel', style_class: 'cbl-confirm-button', can_focus: true});
+            this._resetConfirm = new St.Button({label: 'Apply', style_class: 'cbl-confirm-button cbl-reset-use', can_focus: true});
+            this._resetCancel.connect('clicked', () => {
+                if (!this._resetBusy) { this._pendingReset = null; this._resetBox.hide(); }
+            });
+            this._resetConfirm.connect('clicked', () => this._confirmReset());
+            actions.add_child(this._resetCancel);
+            actions.add_child(this._resetConfirm);
+            this._resetBox.add_child(actions);
+            this._content.add_child(this._resetBox);
+        }
+        this._pendingReset = {accountKey: account.account_key, offerKey: offer.offer_key};
+        const expiry = offer.expiry ? new Date(offer.expiry).toLocaleString('en-GB', {timeZoneName: 'short'}) : 'unknown';
+        this._resetText.text = `Use reset for ${accountTitle(account)}?\n${offer.scope === 'full' ? 'Full · week + 5h' : 'Reset limits'}\nExpires: ${expiry}\nThis spends one reset credit.`;
+        this._resetConfirm.reactive = true;
+        this._resetCancel.reactive = true;
+        this._resetBox.show();
+        this._resetCancel.grab_key_focus();
+    }
+
+    _confirmReset() {
+        if (this._resetBusy || !this._pendingReset) return;
+        const pending = this._pendingReset;
+        const account = (this._latestResetAccounts || []).find(a => a.account_key === pending.accountKey && a.status === 'ready');
+        const offer = resetCreditPresentation(account?.reset_credits).offers.find(o => o.offer_key === pending.offerKey);
+        this._pendingReset = null;
+        if (!account || !offer || offer.expiry === null || offer.scope === 'unknown') {
+            this._resetText.text = 'Reset unavailable. Refresh the account and try again.';
+            this._resetConfirm.reactive = false;
+            return;
+        }
+        this._resetBusy = true;
+        this._resetConfirm.reactive = false;
+        this._resetCancel.reactive = false;
+        this._getJSON(RESET_USE_URL, 'POST', (payload, err) => {
+            this._resetBusy = false;
+            this._resetCancel.reactive = true;
+            if (err || !payload?.ok) {
+                this._resetText.text = payload?.error_code === 'reset_unavailable'
+                    ? 'Reset unavailable in this build.' : 'Outcome unknown. Check current usage before trying again.';
+                this.refresh();
+                return;
+            }
+            this._resetBox.hide();
+            this._applyStatus(payload);
+        }, {account_key: pending.accountKey, offer_key: pending.offerKey});
     }
 
     _manualRefresh() {
@@ -593,12 +701,13 @@ class CblIndicator extends PanelMenu.Button {
     }
 
     _applyAccounts(accounts) {
+        this._latestResetAccounts = accounts || [];
         this._cards = [];
         this._accountsBox.destroy_all_children();
         if (!accounts || !accounts.length)
             return;
         for (const account of accounts) {
-            const card = new AccountCard(account, value => this._requestRemove(value), {updating: this._backendRefreshing});
+            const card = new AccountCard(account, value => this._requestRemove(value), {updating: this._backendRefreshing}, (value, offer) => this._requestReset(value, offer));
             this._cards.push(card);
             for (const meter of card._meters || [])
                 meter.setLightTheme(this._lightTheme);

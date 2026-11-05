@@ -54,6 +54,7 @@ type UsageSnapshot struct {
 	SecondaryWindow *UsageWindow
 	IndividualLimit *CreditLimit
 	CreditsBalance  *float64
+	ResetCredits    *ResetCreditStatus
 	AdditionalRates []NamedWindow
 	FetchedAt       time.Time
 	Source          string

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {accountPresentation, AccountRemoval, overallUsageState, loginErrorPresentation} from './ui-data.js';
+import {accountPresentation, AccountRemoval, overallUsageState, loginErrorPresentation, resetCreditPresentation} from './ui-data.js';
 class Actor {
     constructor(...args) { this._init(...args); }
     _init(props = {}) { Object.assign(this, props); this.children = []; this.handlers = {}; this.clutter_text = {}; this.visible = true; this.styleClasses = new Set(); }
@@ -42,13 +42,13 @@ const file = {get_child() { return file; }, get_path() { return '/extension/icon
 let themeBackground = {red: 32, green: 32, blue: 32, alpha: 255};
 
 const context = vm.createContext({
-    TextDecoder, Date, Math, console, accountPresentation, AccountRemoval, overallUsageState, loginErrorPresentation,
+    TextDecoder, TextEncoder, Date, Math, console, accountPresentation, AccountRemoval, overallUsageState, loginErrorPresentation, resetCreditPresentation,
     Gio: {FileIcon: class { static new() { return {}; } }, ThemedIcon: class {}, File: {new_for_path() { return {}; }}},
-    GLib: {PRIORITY_DEFAULT: 0, SOURCE_REMOVE: false, SOURCE_CONTINUE: true,
+    GLib: {Bytes: class {constructor(bytes) {this.bytes = bytes;}}, PRIORITY_DEFAULT: 0, SOURCE_REMOVE: false, SOURCE_CONTINUE: true,
         timeout_add: timer, timeout_add_seconds: timer, Source: {remove(id) { timers.delete(id); }}},
     GObject: {registerClass(klass) { return klass; }},
     St: {BoxLayout: Actor, Widget: Actor, Label: Actor, Button: Actor, Icon: Actor, DrawingArea: Actor},
-    Soup: {Session: {new() { return session; }}, Message: {new(method, url) { return {method, url}; }}},
+    Soup: {Session: {new() { return session; }}, Message: {new(method, url) { return {method, url, set_request_body_from_bytes(type, bytes) {this.body = JSON.parse(new TextDecoder().decode(bytes.bytes));}}; }}},
     Clutter: {ActorAlign: {CENTER: 0}}, Extension: class {}, PanelMenu: {Button: PanelButton},
     Main: {}, PopupMenu: {PopupBaseMenuItem: Actor, PopupMenuItem: MenuItem, PopupSeparatorMenuItem: Actor},
 });
@@ -76,6 +76,54 @@ assert.equal(indicator._cards[0]._detail.visible, false, 'timestamp consumes no 
 assert.equal(indicator._cards[1]._state.text, 'Нужен вход');
 assert.equal(indicator._cards[1]._state.visible, true);
 assert.equal(indicator._cards[0]._meters.length, 3, 'real card retains its meters');
+indicator._applyStatus({ok: true, accounts: [{...a, reset_credits: {available_count: 2, applicable_available_count: 0}}, b]});
+const resetCard = indicator._cards[0];
+assert.equal(resetCard.children[0].children[1].children.length, 1, 'only subscription is shown in header');
+assert.equal(resetCard.children[0].children[1].y_align, 0, 'plan row centered vertically');
+const resetNote = resetCard.children.find(child => child.style_class === 'cbl-reset-note');
+assert.equal(resetNote.text, 'Resets: 2 · expiry unavailable');
+assert.equal(resetNote.handlers.clicked, undefined, 'unverified action is not clickable');
+assert.equal(requests.length, 0, 'rendering reset inventory never sends mutation requests');
+indicator._applyStatus({ok: true, accounts: [{...a, reset_credits: {available_count: 2, offers: [{offer_key: 'c'.repeat(64), scope: 'full', expires_at: '2099-11-30T19:20:00Z'}]}}]});
+const disclosure = indicator._cards[0].children.find(child => child.style_class === 'cbl-reset-summary').children[1];
+const details = indicator._cards[0].children.find(child => child.style_class === 'cbl-reset-details');
+assert.equal(disclosure.label, '▾');
+assert.equal(disclosure.can_focus, true);
+assert.equal(details.visible, false);
+disclosure.click();
+assert.equal(details.visible, true);
+assert.equal(disclosure.label, '▴');
+disclosure.click();
+assert.equal(details.visible, false);
+assert.equal(disclosure.label, '▾');
+assert.equal(requests.length, 0, 'disclosure never consumes a reset');
+const useReset = details.children[0].children[1];
+assert.equal(useReset.label, 'Apply');
+useReset.click();
+assert.equal(requests.length, 0, 'first click only asks for confirmation');
+assert.equal(indicator._resetCancel.focused, true);
+indicator._resetCancel.click();
+indicator._resetConfirm.click();
+assert.equal(requests.length, 0, 'cancel prevents reset');
+useReset.click();
+indicator._resetConfirm.click();
+indicator._confirmReset();
+assert.equal(requests.length, 1, 'only one synthetic POST after explicit confirmation');
+const syntheticUse = requests.shift();
+assert.equal(syntheticUse.message.method, 'POST');
+assert.equal(syntheticUse.message.url, 'http://127.0.0.1:18088/api/reset-credits/use');
+assert.equal(syntheticUse.message.body.account_key, a.account_key);
+assert.equal(syntheticUse.message.body.offer_key, 'c'.repeat(64));
+syntheticUse.callback(session, {ok: true, accounts: [a, b]});
+assert.equal(indicator._resetBox.visible, false);
+// A disappeared account/offer cannot be confirmed from an old card.
+useReset.click();
+indicator._applyAccounts([a, b]);
+indicator._resetConfirm.click();
+assert.equal(requests.length, 0, 'stale offer cannot mutate');
+indicator._resetCancel.click();
+indicator._applyStatus({ok: true, accounts: [a, b]});
+assert.equal(indicator._cards[0].children.some(child => child.style_class === 'cbl-reset-note'), false, 'absent reset data takes no space');
 themeBackground = {red: 245, green: 245, blue: 245, alpha: 255};
 indicator.menu.box.handlers['style-changed']();
 assert.ok(indicator._cards[0]._meters.every(meter => meter._light && meter.repaintQueued), 'existing canvas meters change palette');

@@ -93,7 +93,36 @@
   font-weight: 800;
 }
 
+.cbl-plan-row { spacing: 6px; }
+.cbl-reset-toggle {
+  color: #f4f4f5;
+  background-color: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 0 4px;
+  min-width: 20px;
+  min-height: 20px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.cbl-reset-toggle:hover,
+.cbl-reset-toggle:focus { background-color: #494950; }
+.cbl-light-theme .cbl-reset-toggle {
+  color: #202124;
+  background-color: transparent;
+}
+.cbl-light-theme .cbl-reset-toggle:hover,
+.cbl-light-theme .cbl-reset-toggle:focus { background-color: #d1d5db; }
+.cbl-reset-use { color: #ffffff; background-color: #245bb5; padding: 3px 8px; border-radius: 5px; font-size: 10px; font-weight: 700; }
+.cbl-reset-use:hover, .cbl-reset-use:focus { background-color: #17478f; }
+.cbl-light-theme .cbl-reset-use { color: #ffffff; background-color: #245bb5; }
+.cbl-light-theme .cbl-reset-use:hover, .cbl-light-theme .cbl-reset-use:focus { background-color: #17478f; }
+.cbl-reset-note { color: #a8a8b3; font-size: 12px; margin-top: 6px; }
+.cbl-light-theme .cbl-reset-note { color: #55575b; }
+
 .cbl-plan-pill {
+  text-align: center;
   border-radius: 999px;
   color: #06140c;
   background-color: #2ed36f;
