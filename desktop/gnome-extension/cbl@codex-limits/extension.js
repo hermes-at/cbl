@@ -541,12 +541,14 @@ class CblIndicator extends PanelMenu.Button {
         const account = (this._latestResetAccounts || []).find(a => a.account_key === pending.accountKey && a.status === 'ready');
         const offer = resetCreditPresentation(account?.reset_credits).offers.find(o => o.offer_key === pending.offerKey);
         this._pendingReset = null;
-        if (!account || !offer || offer.expiry === null || offer.scope === 'unknown') {
+        if (this._serviceUnavailable || !account || !offer || offer.expiry === null || offer.scope === 'unknown') {
             this._resetText.text = 'Reset unavailable. Refresh the account and try again.';
             this._resetConfirm.reactive = false;
             return;
         }
         this._resetBusy = true;
+        // Older polling responses must not overwrite post-redemption readback.
+        this._requestGeneration++;
         this._resetConfirm.reactive = false;
         this._resetCancel.reactive = false;
         this._getJSON(RESET_USE_URL, 'POST', (payload, err) => {
@@ -559,7 +561,8 @@ class CblIndicator extends PanelMenu.Button {
                 return;
             }
             this._resetBox.hide();
-            this._applyStatus(payload);
+            if (Array.isArray(payload.accounts)) this._applyStatus(payload);
+            else this.refresh();
         }, {account_key: pending.accountKey, offer_key: pending.offerKey});
     }
 

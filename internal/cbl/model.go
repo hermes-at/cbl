@@ -1,6 +1,9 @@
 package cbl
 
-import "time"
+import (
+	"net/http"
+	"time"
+)
 
 type Options struct {
 	AuthFile   string
@@ -10,6 +13,9 @@ type Options struct {
 	Fixture    string
 	JSON       bool
 	Waybar     bool
+
+	ResetUseHTTPClient  *http.Client
+	ResetUseIDGenerator func() (string, error)
 }
 
 type Credentials struct {

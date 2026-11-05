@@ -122,6 +122,15 @@ indicator._applyAccounts([a, b]);
 indicator._resetConfirm.click();
 assert.equal(requests.length, 0, 'stale offer cannot mutate');
 indicator._resetCancel.click();
+// A service failure must invalidate confirmation even when old cards remain.
+const liveOffer = {offer_key: 'c'.repeat(64), scope: 'full', expires_at: '2099-11-30T19:20:00Z'};
+const resetAccount = {...a, reset_credits: {available_count: 1, offers: [liveOffer]}};
+indicator._applyStatus({ok: true, accounts: [resetAccount]});
+indicator._requestReset(resetAccount, {...liveOffer, expiry: Date.parse(liveOffer.expires_at)});
+indicator._applyError(new Error('offline'));
+indicator._confirmReset();
+assert.equal(requests.length, 0, 'offline service cannot confirm stale reset');
+indicator._resetCancel.click();
 indicator._applyStatus({ok: true, accounts: [a, b]});
 assert.equal(indicator._cards[0].children.some(child => child.style_class === 'cbl-reset-note'), false, 'absent reset data takes no space');
 themeBackground = {red: 245, green: 245, blue: 245, alpha: 255};

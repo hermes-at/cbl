@@ -22,7 +22,7 @@ func TestVersionReportsRelease(t *testing.T) {
 	os.Stdout = old
 	output, _ := io.ReadAll(r)
 	_ = r.Close()
-	if strings.TrimSpace(string(output)) != "cbl v0.3.2" {
+	if strings.TrimSpace(string(output)) != "cbl v0.3.3" {
 		t.Fatalf("version=%q", output)
 	}
 }

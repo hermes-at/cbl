@@ -26,6 +26,15 @@ It gives you:
 
 CBL does **not** require Codex CLI. It stores its own login data in `~/.config/cbl`.
 
+## What's new in v0.3.3
+
+- Automatic light/dark popup palettes, including meters and interactive controls.
+- Quiet healthy account cards: no redundant status/update timestamps; compact actionable login errors instead of raw upstream responses.
+- Expiring manual reset credits with a minimal disclosure arrow, individual deadlines and compact **Apply** buttons. Scheduled window renewal remains separate from credit expiry.
+- Applying a reset requires a separate confirmation with **Cancel** focused. The backend revalidates the selected account/offer and checks readback; durable guards prevent repeating an uncertain attempt, including after restart.
+- **Verification boundary:** the redemption path is implemented and tested against a local simulated provider. Real OpenAI reset consumption has deliberately not been executed during testing. Final confirmation can spend a real reset credit; do not click it just to preview the UI.
+- Existing accounts and proxy settings are preserved when upgrading; log out/in on GNOME Wayland to reload the extension.
+
 ## What's new in v0.3.2
 
 - Account cards have a **×** button. The first click opens a confirmation with **Отмена** (Cancel) focused by default; only **Удалить** (Delete) removes the account from CBL.
