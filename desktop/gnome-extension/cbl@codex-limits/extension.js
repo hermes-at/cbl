@@ -8,7 +8,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import {accountPresentation, AccountRemoval, overallUsageState} from './ui-data.js';
+import {accountPresentation, AccountRemoval, overallUsageState, loginErrorPresentation} from './ui-data.js';
 
 const STATUS_URL = 'http://127.0.0.1:18088/api/status';
 const REFRESH_URL = 'http://127.0.0.1:18088/api/refresh';
@@ -96,12 +96,27 @@ class ProgressCard extends St.BoxLayout {
     }
 });
 
-function meterColor(remaining) {
+function meterColor(remaining, light = false) {
+    if (light) {
+        if (remaining <= 10)
+            return [0.706, 0.137, 0.184, 1.0];
+        if (remaining <= 30)
+            return [0.502, 0.329, 0, 1.0];
+        return [0.078, 0.478, 0.239, 1.0];
+    }
     if (remaining <= 10)
         return [1.0, 0.36, 0.36, 1.0];
     if (remaining <= 30)
         return [0.96, 0.77, 0.26, 1.0];
     return [0.18, 0.83, 0.44, 1.0];
+}
+
+function colorLuminance(color) {
+    const channel = value => {
+        const normalized = value / 255;
+        return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * channel(color.red) + 0.7152 * channel(color.green) + 0.0722 * channel(color.blue);
 }
 
 function roundedRect(cr, x, y, width, height, radius) {
@@ -119,8 +134,14 @@ class MiniMeter extends St.DrawingArea {
     _init(remaining) {
         super._init({style_class: 'cbl-mini-meter'});
         this._remaining = clamp(remaining, 0, 100);
+        this._light = false;
         this.set_size(160, 8);
         this.connect('repaint', () => this._repaint());
+    }
+
+    setLightTheme(light) {
+        this._light = light;
+        this.queue_repaint();
     }
 
     _repaint() {
@@ -130,14 +151,14 @@ class MiniMeter extends St.DrawingArea {
             width = width || 160;
             height = height || 8;
             roundedRect(cr, 0, 0, width, height, height / 2);
-            cr.setSourceRGBA(0.23, 0.23, 0.25, 1.0);
+            cr.setSourceRGBA(...(this._light ? [0.82, 0.83, 0.85, 1.0] : [0.23, 0.23, 0.25, 1.0]));
             cr.fill();
 
             const fillWidth = this._remaining <= 0
                 ? 2
                 : Math.max(2, Math.round(width * this._remaining / 100));
             roundedRect(cr, 0, 0, fillWidth, height, height / 2);
-            cr.setSourceRGBA(...meterColor(this._remaining));
+            cr.setSourceRGBA(...meterColor(this._remaining, this._light));
             cr.fill();
         } finally {
             cr.$dispose();
@@ -149,6 +170,7 @@ const AccountCard = GObject.registerClass(
 class AccountCard extends St.BoxLayout {
     _init(account, onRemove, presentation = {}) {
         super._init({vertical: true, style_class: 'cbl-account-card'});
+        this._meters = [];
 
         const header = new St.BoxLayout({vertical: false, style_class: 'cbl-account-header'});
         const title = new St.Label({
@@ -195,6 +217,7 @@ class AccountCard extends St.BoxLayout {
     setPresentation(options) {
         const state = accountPresentation(this._account, options);
         this._state.text = state.label;
+        this._state.visible = Boolean(state.label);
         this._state.style_class = `cbl-account-state cbl-state-${state.tone}`;
         this._detail.text = state.detail || '';
         this._detail.visible = Boolean(state.detail);
@@ -206,6 +229,7 @@ class AccountCard extends St.BoxLayout {
         const row = new St.BoxLayout({vertical: false, style_class: 'cbl-meter-row'});
         const label = new St.Label({text: name, style_class: 'cbl-meter-label'});
         const track = new MiniMeter(remaining);
+        this._meters.push(track);
         const value = new St.Label({
             text: data?.label ? String(data.label) : `${remaining}%`,
             style_class: 'cbl-meter-value',
@@ -233,6 +257,7 @@ class CblIndicator extends PanelMenu.Button {
         this._session.timeout = 30;
         this._extension = extension;
         this._loginID = '';
+        this._loginActive = false;
         this._latestUserCode = '';
         this._refreshing = false;
         this._refreshTimeoutId = 0;
@@ -260,6 +285,8 @@ class CblIndicator extends PanelMenu.Button {
         this._content = new St.BoxLayout({vertical: true, style_class: 'cbl-popup'});
         this._root.add_child(this._content);
         this.menu.addMenuItem(this._root);
+        this._themeChangedId = this.menu.box.connect('style-changed', () => this._syncTheme());
+        this._syncTheme();
 
         const header = new St.BoxLayout({vertical: false, style_class: 'cbl-header'});
         const titleBox = new St.BoxLayout({vertical: true, x_expand: true});
@@ -307,6 +334,9 @@ class CblIndicator extends PanelMenu.Button {
         this._removeBox.hide();
 
         this._loginBox = new St.BoxLayout({vertical: true, style_class: 'cbl-login-box'});
+        this._loginTitle = new St.Label({text: '', style_class: 'cbl-login-title cbl-state-error'});
+        this._loginBox.add_child(this._loginTitle);
+        this._loginTitle.hide();
         this._loginText = new St.Label({text: 'To add an account: click “Add Account…”, confirm in the browser, then click “I confirmed login”.', style_class: 'cbl-card-meta'});
         this._loginText.clutter_text.line_wrap = true;
         this._loginBox.add_child(this._loginText);
@@ -354,6 +384,10 @@ class CblIndicator extends PanelMenu.Button {
 
     destroy() {
         this._destroyed = true;
+        if (this._themeChangedId) {
+            this.menu.box.disconnect(this._themeChangedId);
+            this._themeChangedId = 0;
+        }
         this._requestGeneration++;
         this._session.abort();
         if (this._applyTimeoutId) {
@@ -377,6 +411,23 @@ class CblIndicator extends PanelMenu.Button {
             this._manualCooldownId = 0;
         }
         super.destroy();
+    }
+
+    _syncTheme() {
+        if (!this._root)
+            return;
+        // Sample the native menu surface, not the transparent menu item or our overrides.
+        const color = this.menu.box.get_theme_node().get_background_color();
+        const light = colorLuminance(color) > 0.5;
+        this._lightTheme = light;
+        if (light)
+            this._root.add_style_class_name('cbl-light-theme');
+        else
+            this._root.remove_style_class_name('cbl-light-theme');
+        for (const card of this._cards) {
+            for (const meter of card._meters || [])
+                meter.setLightTheme(light);
+        }
     }
 
     _loadIcon(relPath) {
@@ -527,7 +578,7 @@ class CblIndicator extends PanelMenu.Button {
         this._heading.text = 'Codex';
         this._subheading.text = `${accounts.length} ${accounts.length === 1 ? 'profile' : 'profiles'}`;
         this._badge.hide();
-        this._loginBox.hide();
+        this._loginBox.visible = this._loginActive;
         this._setIdleStatus();
         this._applyAccounts(accounts);
     }
@@ -549,6 +600,8 @@ class CblIndicator extends PanelMenu.Button {
         for (const account of accounts) {
             const card = new AccountCard(account, value => this._requestRemove(value), {updating: this._backendRefreshing});
             this._cards.push(card);
+            for (const meter of card._meters || [])
+                meter.setLightTheme(this._lightTheme);
             this._accountsBox.add_child(card);
         }
     }
@@ -616,7 +669,25 @@ class CblIndicator extends PanelMenu.Button {
         this._statusItem.label.text = `Status: ${message}`;
     }
 
+    _showLoginError(error) {
+        const presentation = loginErrorPresentation(error);
+        this._loginTitle.text = presentation.title;
+        this._loginTitle.show();
+        this._loginText.text = presentation.detail;
+        this._addAccountItem.label.text = '↻ Повторить вход';
+        this._loginBox.show();
+        this._codeItem.label.text = 'Code: —';
+        this._codeItem.setSensitive(false);
+        this._codeItem.hide();
+        this._cancelLoginItem.show();
+    }
+
     _startLogin() {
+        this._loginActive = true;
+        this._addAccountItem.label.text = '🔑 Add Account…';
+        this._loginID = '';
+        this._loginTitle.hide();
+        this._loginText.text = 'Запрашиваем код входа…';
         this._latestUserCode = '';
         this._codeItem.setSensitive(false);
         this._codeItem.show();
@@ -626,9 +697,9 @@ class CblIndicator extends PanelMenu.Button {
         this._codeItem.label.text = 'Requesting code…';
         this._getJSON(LOGIN_START_URL, 'POST', (payload, err) => {
             if (err || !payload?.ok) {
-                this._codeItem.label.text = `Login failed: ${err?.message || payload?.error || 'unknown error'}`;
+                this._showLoginError(err || payload?.error);
                 this._completeLoginItem.setSensitive(false);
-                this._cancelLoginItem.show();
+                this._completeLoginItem.hide();
                 return;
             }
             this._loginID = payload.id;
@@ -652,6 +723,9 @@ class CblIndicator extends PanelMenu.Button {
     }
 
     _cancelLogin() {
+        this._loginActive = false;
+        this._addAccountItem.label.text = '🔑 Add Account…';
+        this._loginTitle.hide();
         this._loginID = '';
         this._latestUserCode = '';
         this._codeItem.label.text = 'Code: —';
@@ -670,10 +744,12 @@ class CblIndicator extends PanelMenu.Button {
     _completeLogin() {
         if (!this._loginID)
             return;
+        this._loginTitle.hide();
+        this._loginText.text = 'Проверяем подтверждение входа…';
         this._codeItem.label.text = 'Waiting for confirmation…';
         this._getJSON(`${LOGIN_COMPLETE_URL}?id=${encodeURIComponent(this._loginID)}`, 'POST', (payload, err) => {
             if (err || !payload?.ok) {
-                this._codeItem.label.text = `Login failed: ${err?.message || payload?.error || 'unknown error'}`;
+                this._showLoginError(err || payload?.error);
                 return;
             }
             this._loginID = '';
@@ -682,6 +758,9 @@ class CblIndicator extends PanelMenu.Button {
             this._codeItem.setSensitive(false);
             this._codeItem.hide();
             this._loginText.text = '';
+            this._loginActive = false;
+            this._addAccountItem.label.text = '🔑 Add Account…';
+            this._loginTitle.hide();
             this._loginBox.hide();
             this._completeLoginItem.setSensitive(false);
             this._completeLoginItem.hide();

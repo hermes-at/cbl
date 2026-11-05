@@ -174,6 +174,11 @@
   color: #a8a8b3;
 }
 
+.cbl-login-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .cbl-state-ready { color: #2ed36f; }
 .cbl-state-warning { color: #f5c542; }
 .cbl-state-error { color: #ff7373; }
@@ -214,3 +219,75 @@
 .cbl-progress-fill:critical {
   background-color: #ff5c5c;
 }
+
+.cbl-light-theme {
+  color: #202124;
+  background-color: #ffffff;
+}
+
+.cbl-light-theme .cbl-heading,
+.cbl-light-theme .cbl-empty-title,
+.cbl-light-theme .cbl-account-title,
+.cbl-light-theme .cbl-card-value,
+.cbl-light-theme .cbl-meter-value {
+  color: #202124;
+}
+
+.cbl-light-theme .cbl-subheading,
+.cbl-light-theme .cbl-card-meta,
+.cbl-light-theme .cbl-empty-text,
+.cbl-light-theme .cbl-meter-reset,
+.cbl-light-theme .cbl-meter-label,
+.cbl-light-theme .cbl-card-title,
+.cbl-light-theme .cbl-account-remove,
+.cbl-light-theme .cbl-account-state {
+  color: #55575b;
+}
+
+.cbl-light-theme .cbl-account-row,
+.cbl-light-theme .cbl-account-card,
+.cbl-light-theme .cbl-empty-card,
+.cbl-light-theme .cbl-card,
+.cbl-light-theme .cbl-login-box,
+.cbl-light-theme .cbl-remove-confirm {
+  color: #202124;
+  background-color: #f1f2f4;
+  border-color: #c5c7ca;
+}
+
+.cbl-light-theme .cbl-header-refresh,
+.cbl-light-theme .cbl-confirm-button {
+  color: #202124;
+  background-color: #e5e7eb;
+  border-color: #b8bbc0;
+}
+
+.cbl-light-theme .cbl-progress-track {
+  background-color: #c5c7ca;
+}
+
+.cbl-light-theme .cbl-state-ready { color: #147a3d; }
+.cbl-light-theme .cbl-state-warning { color: #805400; }
+.cbl-light-theme .cbl-state-error { color: #b4232f; }
+.cbl-light-theme .cbl-state-updating { color: #2458a6; }
+.cbl-light-theme .cbl-danger { color: #a21d2d; }
+.cbl-light-theme .cbl-plan-pill,
+.cbl-light-theme .cbl-badge { color: #06391b; }
+
+.cbl-light-theme .cbl-account-remove:hover,
+.cbl-light-theme .cbl-account-remove:focus {
+  color: #a21d2d;
+  background-color: #f4dce0;
+}
+
+.cbl-light-theme .cbl-header-refresh:hover,
+.cbl-light-theme .cbl-header-refresh:focus,
+.cbl-light-theme .cbl-confirm-button:hover,
+.cbl-light-theme .cbl-confirm-button:focus {
+  background-color: #d1d3d7;
+  box-shadow: inset 0 0 0 2px #55575b;
+}
+
+.cbl-light-theme .cbl-progress-fill { background-color: #147a3d; }
+.cbl-light-theme .cbl-progress-fill:warning { background-color: #805400; }
+.cbl-light-theme .cbl-progress-fill:critical { background-color: #b4232f; }

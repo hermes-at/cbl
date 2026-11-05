@@ -1,5 +1,19 @@
 import assert from 'node:assert/strict';
-import {accountErrorMessage, accountWorstRemaining, overallUsageState, accountPresentation, AccountRemoval} from './ui-data.js';
+import {accountErrorMessage, accountWorstRemaining, overallUsageState, accountPresentation, AccountRemoval, loginErrorPresentation} from './ui-data.js';
+for (const [error, title] of [
+    ['403 unsupported_country_region_territory', 'Вход недоступен'],
+    [new Error('request timed out'), 'Сервер не ответил'],
+    ['dial tcp: connection refused', 'Нет соединения с OpenAI'],
+    ['429 Too many requests', 'Слишком много запросов'],
+    ['403 Forbidden', 'Не удалось войти'],
+    ['<html>SECRET</html>'.repeat(10000), 'Не удалось войти'],
+    [null, 'Не удалось войти'],
+]) {
+    const result = loginErrorPresentation(error);
+    assert.equal(result.title, title);
+    assert.ok(result.title.length < 40 && result.detail.length < 160, 'messages stay bounded');
+    assert.doesNotMatch(result.detail, /SECRET|<html>|403|tcp/);
+}
 assert.equal(accountErrorMessage('codex usage request failed: 401 Unauthorized: {"error":{"code":"invalid_jwt"}}; token refresh also failed: invalid_refresh_token'), 'Session expired — add this account again');
 assert.equal(accountErrorMessage({code: 'invalid_jwt'}), 'Session expired — add this account again');
 assert.equal(accountErrorMessage({code: 'invalid_refresh_token'}), 'Session expired — add this account again');
@@ -7,9 +21,13 @@ assert.equal(accountErrorMessage({message: '<html>' + 'x'.repeat(5000) + '</html
 assert.equal(accountWorstRemaining({error: 'invalid_jwt', windows: []}), null);
 assert.equal(overallUsageState([{windows: [{remaining: 100}]}, {error: 'failed'}]), 'error');
 assert.equal(overallUsageState([{windows: [{remaining: 95}]}]), 'good');
-assert.equal(accountPresentation({status: 'ready', fetched_at: '2026-11-03T17:00:00Z'}).label, 'Данные актуальны');
+const ready = {status: 'ready', fetched_at: '2026-11-03T17:00:00Z'};
+assert.equal(accountPresentation(ready).label, '', 'healthy accounts have no status line');
+assert.equal(accountPresentation(ready).detail, undefined, 'last update time is not displayed');
 assert.equal(accountPresentation({status: 'ready'}).label, 'Нет данных');
-assert.equal(accountPresentation({status: 'ready'}, {updating: true}).label, 'Обновляется…');
+assert.equal(accountPresentation(ready, {updating: true}).label, '', 'refresh does not add a healthy account notification');
+assert.equal(accountPresentation({status: 'auth_required'}, {updating: true}).label, 'Нужен вход', 'refresh must not hide auth problems');
+assert.equal(accountPresentation({status: 'connection_error'}, {updating: true}).label, 'Ошибка соединения', 'refresh must not hide account problems');
 assert.equal(accountPresentation({status: 'auth_required'}).label, 'Нужен вход');
 assert.equal(accountPresentation({status: 'connection_error'}).label, 'Ошибка соединения');
 assert.equal(accountPresentation({error: 'invalid_refresh_token'}).label, 'Нужен вход');
